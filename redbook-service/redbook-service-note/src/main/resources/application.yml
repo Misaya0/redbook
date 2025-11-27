@@ -1,0 +1,104 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: redbook-service-note
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  cache:
+    cache-names: noteCache
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=5m
+  shardingsphere:
+    datasource:
+      names: ds0
+      ds0:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbc-url: jdbc:mysql://localhost:3306/rb_note?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true
+        username: root
+        password: 1234
+    sharding:
+      tables:
+        rb_note:
+          actual-data-nodes: ds0.rb_note_$->{0..2}
+          table-strategy:
+            inline:
+              sharding-column: id
+              algorithm-expression: rb_note_$->{id % 3}
+          key-generator:
+            column: id
+            type: SNOWFLAKE
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+  # Kafka 配置
+  kafka:
+    # Kafka 集群地址
+    bootstrap-servers: localhost:9092
+    # 消费者相关配置
+    consumer:
+      # 消费者组 ID
+      group-id: redbook-note-consumer
+      # 消费位点策略：latest 表示从最新位置开始
+      auto-offset-reset: latest
+      # 是否自动提交 offset，开启自动提交以减少处理延迟
+      enable-auto-commit: true
+      # Key 反序列化器
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Value 反序列化器
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    # 生产者相关配置
+    producer:
+      # 发送失败重试次数，设置为 0 以追求最快速
+      retries: 0
+      # 应答级别：0 表示不等待 broker 确认
+      acks: 0
+      # Key 序列化器
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Value 序列化器
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    # 监听容器配置
+    listener:
+      # 自动确认模式，减少处理开销
+      ack-mode: RECORD
+  redis:
+    host: localhost
+    port: 6379
+    password:
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: redbook
+      username: root
+      password: root
+      authentication-database: admin
+oss:
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  accessKeyId: your-access-key-id
+  accessKeySecret: your-access-key-secret
+  bucketName: your-bucket-name
+deepseek:
+  api_url: https://api.deepseek.com/v1/chat/completions
+  api_key: sk-c0f852e695e846508858e7f051a7ded6
+map:
+  key: your-gaode-map-key
+geo:
+  distance: 5
