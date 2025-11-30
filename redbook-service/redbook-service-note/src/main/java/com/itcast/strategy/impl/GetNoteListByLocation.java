@@ -23,7 +23,8 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+// 暂时禁用：需要 Redis 3.2+ 版本支持 GEO 命令
+// @Component
 @Slf4j
 public class GetNoteListByLocation implements GetNotesStrategy {
 

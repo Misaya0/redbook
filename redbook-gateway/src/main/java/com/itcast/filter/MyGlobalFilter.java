@@ -47,9 +47,10 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         try {
             String userId = JwtUtil.parseToken(token);
             // 6.向请求头添加userId
-            request.mutate().header("userId", userId);
-            log.info("网关全局过滤器结束");
-            return chain.filter(exchange);
+            ServerHttpRequest modifiedRequest = request.mutate().header("userId", userId).build();
+            ServerWebExchange modifiedExchange = exchange.mutate().request(modifiedRequest).build();
+            log.info("网关全局过滤器结束，userId: {}", userId);
+            return chain.filter(modifiedExchange);
         } catch (TokenExpiredException | JWTDecodeException e2) {
             response.setStatusCode(HttpStatus.valueOf(ResponseEnum.UNAUTHORIZED.getCode()));
             return response.setComplete();

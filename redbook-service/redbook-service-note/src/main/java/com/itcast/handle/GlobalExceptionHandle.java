@@ -39,6 +39,7 @@ public class GlobalExceptionHandle {
                     .build();
             log.error("异常发生在: {}.{}({}:{})",
                     firstStack.getClassName(), firstStack.getMethodName(), firstStack.getFileName(), firstStack.getLineNumber());
+            log.error("异常详细信息: {}", e.getMessage(), e);
             kafkaTemplate.send("system-exception-log", objectMapper.writeValueAsString(exceptionMessage));
         } catch (JsonProcessingException jsonProcessingException) {
             log.error("记录日志失败:{}", jsonProcessingException.getMessage());

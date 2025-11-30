@@ -36,7 +36,7 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public Result<String> send(String phone) {
         // 1.生成验证码
-        String code = CodeUtil.generateCode(4);
+        String code = CodeUtil.generateCode(6);
         log.info("验证码为：{}", code);
         // 2.保存到redis
         redisTemplate.opsForValue().set(

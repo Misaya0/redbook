@@ -4,10 +4,11 @@ import com.itcast.handler.NoteHandler;
 import com.itcast.model.dto.NoteDto;
 import com.itcast.context.UserContext;
 import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-//@Component
+@Component
 @Order(1)
 public class SetUserIdHandler extends NoteHandler {
     @Override

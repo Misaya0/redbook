@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-@Component
+// 暂时禁用：需要 Redis 3.2+ 版本支持 GEO 命令
+// @Component
 @Order(9)
 @Slf4j
 public class SaveLocationToRedisHandler extends NoteHandler {

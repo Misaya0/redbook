@@ -20,6 +20,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/user/send/**",
                         "/user/verify",
+                        "/user/getAttention/**",
+                        "/user/getUserById/**",
                         // Swagger / OpenAPI 相关路径放行
                         "/v3/api-docs/**",
                         "/swagger-ui.html",

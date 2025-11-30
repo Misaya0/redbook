@@ -2,7 +2,6 @@ package com.itcast;
 
 import com.itcast.service.LoginService;
 import com.itcast.model.dto.LoginDto;
-import com.itcast.util.AgeUtil;
 import com.itcast.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,12 +23,12 @@ class RedbookServiceUserApplicationTests {
         System.out.println(userId);
     }
 
-    @Test
-    void testAge() throws ParseException {
-        String birthday = "2001-05-12";
-        Integer age = AgeUtil.calAge(birthday);
-        System.out.println(age);
-    }
+//    @Test
+//    void testAge() throws ParseException {
+//        String birthday = "2001-05-12";
+//        Integer age = AgeUtil.calAge(birthday);
+//        System.out.println(age);
+//    }
 
     @Test
     void loginNotice() {

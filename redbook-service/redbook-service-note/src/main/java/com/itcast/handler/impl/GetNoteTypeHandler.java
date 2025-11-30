@@ -25,7 +25,7 @@ import java.util.Map;
 @Slf4j
 public class GetNoteTypeHandler extends NoteHandler {
 
-    private final List<String> typeList = Arrays.asList("情感", "体育", "穿搭", "美食");
+    private final List<String> typeList = Arrays.asList("情感", "体育", "穿搭", "美食", "旅行", "搞笑", "音乐", "职场");
 
     @Override
     public void handle(NoteDto noteDto) throws IOException, InterruptedException {
@@ -37,19 +37,57 @@ public class GetNoteTypeHandler extends NoteHandler {
                 "你是一个专业的文本分类助手。请根据以下标题和内容，在 %s 这些类别中选择最合适的一个，并且只返回该类别的名称，不要提供任何额外的解释或回答。" +
                         "标题：%s" +
                         "内容：%s" +
-                        "请只返回类别名称。",
+                        "请只返回类别名称。如果没有合适的类别，请返回“其他”",
                 typeListString, noteDto.getTitle(), noteDto.getContent());
 
         // 发送请求并获取响应
         String type = sendRequest(prompt);
 
+        // 清理大模型返回的结果，去除特殊标记
+        if (type != null) {
+            type = cleanTypeResult(type);
+        }
+
         noteDto.setType(type);
     }
 
-    @Value("${deepseek.api_url}")
+    /**
+     * 清理大模型返回的类型结果
+     * 去除 <|begin_of_box|> 和 <|end_of_box|> 等特殊标记
+     */
+    private String cleanTypeResult(String type) {
+        if (type == null || type.isEmpty()) {
+            return type;
+        }
+
+        log.info("清理前的类型: {}", type);
+
+        // 去除前后空格
+        type = type.trim();
+
+        // 去除 <|begin_of_box|> 和 <|end_of_box|> 标记
+        type = type.replaceAll("<\\|begin_of_box\\|>", "");
+        type = type.replaceAll("<\\|end_of_box\\|>", "");
+
+        // 去除其他可能的特殊标记
+        type = type.replaceAll("<[^>]+>", "");
+        type = type.replaceAll("\\|[^|]+\\|", "");
+
+        // 去除引号
+        type = type.replaceAll("[\"'`]", "");
+
+        // 去除换行符和多余空格
+        type = type.replaceAll("\\s+", "");
+
+        log.info("清理后的类型: {}", type);
+
+        return type;
+    }
+
+    @Value("${glm.api_url}")
     private String apiUrl;
 
-    @Value("${deepseek.api_key}")
+    @Value("${glm.api_key}")
     private String apiKey;
 
     @SuppressWarnings("unchecked")
@@ -60,9 +98,9 @@ public class GetNoteTypeHandler extends NoteHandler {
                     .connectTimeout(Duration.ofSeconds(10))
                     .build();
 
-            // 2. 构造 JSON 请求体
+            // 2. 构造 JSON 请求体（GLM4 格式）
             String requestBody = String.format(
-                    "{ \"model\": \"deepseek-chat\", \"messages\": [ " +
+                    "{ \"model\": \"glm-4.5v\", \"messages\": [ " +
                             "{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"}, " +
                             "{\"role\": \"user\", \"content\": \"%s\"} " +
                             "], \"temperature\": 0.7 }",

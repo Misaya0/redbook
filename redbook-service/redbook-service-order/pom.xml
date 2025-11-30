@@ -70,6 +70,13 @@
             <artifactId>redbook-common</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- Swagger / OpenAPI：springdoc + Swagger UI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
     </dependencies>
 
 </project>
