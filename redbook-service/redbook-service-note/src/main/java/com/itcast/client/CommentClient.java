@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface CommentClient {
 
     @GetMapping("/comment/getCommentCount/{noteId}")
-    Result<Integer> getCommentCount(@PathVariable("noteId") Integer noteId);
+    Result<Integer> getCommentCount(@PathVariable("noteId") Long noteId);
 }

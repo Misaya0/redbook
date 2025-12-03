@@ -1,5 +1,6 @@
 package com.itcast.controller;
 
+import com.itcast.model.vo.AttentionVo;
 import com.itcast.result.Result;
 import com.itcast.service.AttentionService;
 import com.itcast.model.pojo.Attention;
@@ -38,8 +39,15 @@ public class AttentionController {
 
     @Operation(summary = "获取关注列表", description = "获取指定用户的关注列表")
     @GetMapping("/getAttention/{userId}")
-    public Result<List<Attention>> getAttention(
+    public Result<List<AttentionVo>> getAttention(
             @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
         return attentionService.getAttention(userId);
+    }
+
+    @Operation(summary = "获取粉丝列表", description = "获取指定用户的粉丝列表")
+    @GetMapping("/getFans/{userId}")
+    public Result<List<AttentionVo>> getFans(
+            @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
+        return attentionService.getFans(userId);
     }
 }

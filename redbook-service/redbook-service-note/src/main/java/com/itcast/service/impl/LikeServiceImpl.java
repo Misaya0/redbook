@@ -19,8 +19,10 @@ import com.itcast.context.UserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.Cache;
 
 @Service
 @Slf4j
@@ -37,6 +39,9 @@ public class LikeServiceImpl implements LikeService {
 
     @Autowired
     private LikeMapper likeMapper;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     @Override
     @SendMessage(type = LogType.LIKE)
@@ -86,6 +91,11 @@ public class LikeServiceImpl implements LikeService {
         noteMapper.updateById(note);
         // 3.删除笔记缓存
         redisTemplate.delete(RedisConstant.NOTE_DETAIL_CACHE + noteId);
+
+        Cache noteCache = cacheManager.getCache("noteCache");
+        if (noteCache != null) {
+            noteCache.evict(noteId);  // 关键：本地缓存也要失效
+        }
         return Result.success(null);
     }
 

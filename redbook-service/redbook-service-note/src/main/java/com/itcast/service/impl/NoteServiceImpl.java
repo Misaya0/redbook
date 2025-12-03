@@ -1,6 +1,7 @@
 package com.itcast.service.impl;
 
 import com.itcast.annotation.SendMessage;
+import com.itcast.client.CommentClient;
 import com.itcast.client.UserClient;
 import com.itcast.constant.ExceptionConstant;
 import com.itcast.constant.RedisConstant;
@@ -56,6 +57,9 @@ public class NoteServiceImpl implements NoteService {
     private UserClient userClient;
 
     @Autowired
+    private CommentClient commentClient;
+
+    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
@@ -82,10 +86,12 @@ public class NoteServiceImpl implements NoteService {
 
             // 2.如果缓存不存在，则
             if (cacheNote == null) {
+                boolean locked = false;
                 try {
                     // 2.1 加锁防止缓存击穿
                     if (lock.tryLock()) {
                         log.info("加锁成功");
+                        locked = true;
                         // 2.2 查询数据库
                         note = noteMapper.selectById(noteId);
                         if (note == null) {
@@ -106,14 +112,21 @@ public class NoteServiceImpl implements NoteService {
                     log.error(e.toString());
                     return Result.success(null);
                 } finally {
-                    lock.unlock();
+                    if (locked) {
+                        log.info("释放锁");
+                        lock.unlock();
+                    }
                 }
             } else {
                 note = cacheNote;
+                noteCache.put(noteId, note);
             }
         }
 
         // 3.获取发布笔记用户信息
+        if (note.getUserId() == null) {
+            throw new NoteNoExistException(ExceptionConstant.NOTE_NO_EXIST);
+        }
         User user = userClient.getUserById(note.getUserId()).getData();
         if (user == null) {
             throw new UserNoExistException(ExceptionConstant.USER_NO_EXIST);
@@ -132,7 +145,20 @@ public class NoteServiceImpl implements NoteService {
         BeanUtils.copyProperties(note, noteVo);
         noteVo.setDealTime(dealTime);
         noteVo.setUser(user);
-//        noteVo.setComment(commentClient.getCommentCount(noteId).getData());
+        
+        // 填充评论数 (远程调用)
+        Result<Integer> commentCountResult = commentClient.getCommentCount(noteId);
+        if (commentCountResult != null && commentCountResult.getData() != null) {
+            noteVo.setComment(commentCountResult.getData());
+        } else {
+            noteVo.setComment(0);
+        }
+        
+        // 填充点赞数和收藏数 (从Redis实时获取更准确，或者直接使用数据库中的值)
+        // 注意：这里直接使用note中的值，如果note来自缓存，可能不是最新的。
+        // 如果需要实时性，应该从Redis中获取最新的点赞/收藏数覆盖
+        // 这里假设数据库/缓存中的值是准实时的
+
 
         // 6.加入布隆过滤器
         Integer loginUserId = UserContext.getUserId();

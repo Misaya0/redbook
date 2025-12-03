@@ -16,6 +16,8 @@ import com.itcast.service.CollectionService;
 import com.itcast.context.UserContext;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +36,9 @@ public class CollectionServiceImpl implements CollectionService {
     @Autowired
     private CollectionMapper collectionMapper;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     @Override
     public Result<Boolean> isCollection(Long noteId) {
         Integer userId = UserContext.getUserId();
@@ -43,7 +48,7 @@ public class CollectionServiceImpl implements CollectionService {
     }
 
     @Override
-    public Result<Void> collection(Integer noteId) {
+    public Result<Void> collection(Long noteId) {
         Integer userId = UserContext.getUserId();
         // 1.判断redis中的本用户是否存在这个id
         Boolean isCollection = redisTemplate.opsForValue().getBit(RedisConstant.COLLECTION_SET_CACHE + noteId, userId);
@@ -81,6 +86,12 @@ public class CollectionServiceImpl implements CollectionService {
         noteMapper.updateById(note);
         // 3.删除笔记缓存
         redisTemplate.delete(RedisConstant.NOTE_DETAIL_CACHE + noteId);
+
+        Cache noteCache = cacheManager.getCache("noteCache");
+        if (noteCache != null) {
+            noteCache.evict(noteId);  // 关键：本地缓存也要失效
+        }
+
         return Result.success(null);
     }
 }

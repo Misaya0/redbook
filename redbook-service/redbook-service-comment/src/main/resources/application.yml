@@ -6,14 +6,15 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 192.168.43.1:8848
-  data:
-    mongodb:
-      host: localhost
-      port: 27017
-      database: redbook
-      username: root
-      password: root
-      authentication-database: admin
+        server-addr: localhost:8848
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/rb_note?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 1234
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
 
 

@@ -20,6 +20,10 @@ public class Result<T> {
      */
     private int code;
 
+    // 无参构造，给 Jackson 用
+    public Result() {
+    }
+
     public Result(String message, int code, T data) {
         this.message = message;
         this.code = code;

@@ -6,7 +6,7 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 123.206.101.247:8848
+        server-addr: localhost:8848
     gateway:
       routes:
         # 用户服务路由

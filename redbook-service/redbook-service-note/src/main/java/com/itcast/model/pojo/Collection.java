@@ -23,7 +23,7 @@ public class Collection implements Serializable {
      * 笔记id
      */
     @TableField("note_id")
-    private Integer noteId;
+    private Long noteId;
 
     /**
      * 用户id

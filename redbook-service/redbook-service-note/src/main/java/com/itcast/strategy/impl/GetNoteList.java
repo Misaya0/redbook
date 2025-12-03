@@ -51,7 +51,7 @@ public class GetNoteList implements GetNotesStrategy {
         if (noteList.isEmpty()) {
             return Result.success(new ArrayList<>());
         }
-        // 4.布隆过滤器过滤
+        // 4.布隆过滤器过滤(过滤掉用户已经看过的笔记)
         Integer userId = UserContext.getUserId();
         List<NoteVo> noteVoList = noteList.stream()
                 .filter(note -> !bloomFilterUtil.mightContain(RedisConstant.USER_BLOOM_FILTER + userId, note.getId().toString()))

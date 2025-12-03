@@ -10,7 +10,7 @@ import java.util.List;
 public interface CommentService {
     Result<Void> postComment(CommentDto commentDto);
 
-    Result<List<CommentVo>> getCommentList(Integer noteId) throws ParseException;
+    Result<List<CommentVo>> getCommentList(Long noteId) throws ParseException;
 
-    Result<Integer> getCommentCount(Integer noteId);
+    Result<Integer> getCommentCount(Long noteId);
 }

@@ -6,8 +6,11 @@ import com.itcast.constant.RedisConstant;
 import com.itcast.enums.AttentionTypeEnum;
 import com.itcast.enums.MessageTypeEnum;
 import com.itcast.mapper.AttentionMapper;
+import com.itcast.mapper.UserMapper;
 import com.itcast.model.pojo.Message;
 import com.itcast.model.pojo.Attention;
+import com.itcast.model.pojo.User;
+import com.itcast.model.vo.AttentionVo;
 import com.itcast.result.Result;
 import com.itcast.service.AttentionService;
 import com.itcast.context.UserContext;
@@ -16,13 +19,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class AttentionServiceImpl implements AttentionService {
 
     @Autowired
     private AttentionMapper attentionMapper;
+
+    @Autowired
+    private UserMapper userMapper;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -55,19 +64,20 @@ public class AttentionServiceImpl implements AttentionService {
         attention.setOtherId(otherId);
         attention.setOwnId(ownId);
         // 3.判断是否关注过
-        //Boolean isAttention = redisTemplate.opsForSet().isMember(ATTENTION_SET_CACHE + ownId, otherId);
-        Boolean isAttention = redisTemplate.opsForValue().getBit(
-                RedisConstant.ATTENTION_CACHE + ownId, otherId);
+        Boolean isAttention = redisTemplate.opsForSet().isMember(RedisConstant.ATTENTION_CACHE + ownId, otherId);
 
         // 4.关注或取关
         if(Boolean.TRUE.equals(isAttention)){
             // 4.1 取关
-            attentionMapper.deleteById(attention);
-            redisTemplate.opsForValue().setBit(RedisConstant.ATTENTION_CACHE + ownId, otherId, false);
+            LambdaQueryWrapper<Attention> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Attention::getOwnId, ownId).eq(Attention::getOtherId, otherId);
+            attentionMapper.delete(queryWrapper);
+            redisTemplate.opsForSet().remove(RedisConstant.ATTENTION_CACHE + ownId, otherId);
         }else{
             // 4.2 关注
+            attention.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()));
             attentionMapper.insert(attention);
-            redisTemplate.opsForValue().setBit(RedisConstant.ATTENTION_CACHE + ownId, otherId, true);
+            redisTemplate.opsForSet().add(RedisConstant.ATTENTION_CACHE + ownId, otherId);
 
             // 用户关注，通知消息
             Message attentionMessage = new Message();
@@ -80,10 +90,49 @@ public class AttentionServiceImpl implements AttentionService {
     }
 
     @Override
-    public Result<List<Attention>> getAttention(Integer userId) {
+    public Result<List<AttentionVo>> getAttention(Integer userId) {
         LambdaQueryWrapper<Attention> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Attention::getOwnId, userId);
         List<Attention> attentionList = attentionMapper.selectList(queryWrapper);
-        return Result.success(attentionList);
+        return getAttentionVos(attentionList, true);
+    }
+
+    @Override
+    public Result<List<AttentionVo>> getFans(Integer userId) {
+        LambdaQueryWrapper<Attention> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Attention::getOtherId, userId);
+        List<Attention> attentionList = attentionMapper.selectList(queryWrapper);
+        return getAttentionVos(attentionList, false);
+    }
+
+    private Result<List<AttentionVo>> getAttentionVos(List<Attention> attentionList, boolean isAttentionList) {
+        if (attentionList == null || attentionList.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+
+        List<Integer> userIds = attentionList.stream()
+                .map(a -> isAttentionList ? a.getOtherId() : a.getOwnId())
+                .collect(Collectors.toList());
+
+        List<User> users = userMapper.selectBatchIds(userIds);
+        Map<Integer, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        List<AttentionVo> vos = attentionList.stream().map(a -> {
+            AttentionVo vo = new AttentionVo();
+            Integer targetId = isAttentionList ? a.getOtherId() : a.getOwnId();
+            User user = userMap.get(targetId);
+            if (user != null) {
+                vo.setUserId(user.getId());
+                vo.setNickname(user.getNickname());
+                vo.setImage(user.getImage());
+            } else {
+                vo.setUserId(targetId);
+                vo.setNickname("用户已注销");
+            }
+            vo.setTime(a.getTime());
+            return vo;
+        }).collect(Collectors.toList());
+
+        return Result.success(vos);
     }
 }

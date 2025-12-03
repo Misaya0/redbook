@@ -95,6 +95,10 @@ oss:
   accessKeyId: your-access-key-id
   accessKeySecret: your-access-key-secret
   bucketName: your-bucket-name
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
 # 本地文件存储配置（用于开发测试）
 local-file:
   upload-path: E:/JavaSE/project/RedBook-master/uploads

@@ -26,7 +26,7 @@ public class CollectionController {
     @Operation(summary = "收藏/取消收藏笔记", description = "切换笔记的收藏状态")
     @PutMapping("/collection/{noteId}")
     public Result<Void> collection(
-            @Parameter(description = "笔记ID", required = true) @PathVariable("noteId") Integer noteId) {
+            @Parameter(description = "笔记ID", required = true) @PathVariable("noteId") Long noteId) {
         return collectionService.collection(noteId);
     }
 }
