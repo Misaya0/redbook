@@ -59,7 +59,7 @@ public class LikeServiceImpl implements LikeService {
         if (Boolean.TRUE.equals(isLike)) {
             // 删除点赞
             LambdaQueryWrapper<Like> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Like::getNoteId, noteId);
+            queryWrapper.eq(Like::getNoteId, noteId).eq(Like::getUserId, userId);
             likeMapper.delete(queryWrapper);
 
             // 更新redis
@@ -68,11 +68,11 @@ public class LikeServiceImpl implements LikeService {
             // 更新点赞数
             note.setLike(note.getLike() - 1);
         } else {
-//            // 添加点赞
+            // 添加点赞
             Like like = new Like();
             like.setNoteId(noteId);
             like.setUserId(userId);
-//            likeMapper.insert(like);
+            likeMapper.insert(like);
 
             // 更新redis
             redisTemplate.opsForValue().setBit(RedisConstant.LIKE_SET_CACHE + noteId, userId, true);

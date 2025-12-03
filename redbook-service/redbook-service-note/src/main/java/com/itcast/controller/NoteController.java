@@ -29,10 +29,12 @@ public class NoteController {
     @GetMapping("/getNoteList")
     public Result<List<NoteVo>> getNoteList(
             @Parameter(description = "页码", required = true) @RequestParam("page") Integer page,
-            @Parameter(description = "每页数量", required = true) @RequestParam("pageSize") Integer pageSize) {
+            @Parameter(description = "每页数量", required = true) @RequestParam("pageSize") Integer pageSize,
+            @Parameter(description = "笔记类型", required = false) @RequestParam(value = "type", required = false) String type) {
         NoteStrategyContext context = NoteStrategyContext.builder()
                 .page(page)
                 .pageSize(pageSize)
+                .type(type)
                 .build();
         return noteService.getNotes(NoteStrategyType.DEFAULT, context);
     }

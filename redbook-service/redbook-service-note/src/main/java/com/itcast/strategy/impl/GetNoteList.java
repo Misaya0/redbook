@@ -1,5 +1,6 @@
 package com.itcast.strategy.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.itcast.client.UserClient;
 import com.itcast.constant.RedisConstant;
@@ -41,12 +42,19 @@ public class GetNoteList implements GetNotesStrategy {
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
         // 1.构造分页
         Page<Note> ipage = new Page<>(context.getPage(), context.getPageSize());
-        // 2.根据分页查询笔记
-        Page<Note> notePage = noteMapper.selectPage(ipage, null);
+        
+        // 2.构造查询条件
+        LambdaQueryWrapper<Note> queryWrapper = new LambdaQueryWrapper<>();
+        if (context.getType() != null && !context.getType().isEmpty()) {
+            queryWrapper.eq(Note::getType, context.getType());
+        }
+        
+        // 3.根据分页查询笔记
+        Page<Note> notePage = noteMapper.selectPage(ipage, queryWrapper);
         if (notePage == null) {
             return Result.success(new ArrayList<>());
         }
-        // 3.获取记录
+        // 4.获取记录
         List<Note> noteList = notePage.getRecords();
         if (noteList.isEmpty()) {
             return Result.success(new ArrayList<>());

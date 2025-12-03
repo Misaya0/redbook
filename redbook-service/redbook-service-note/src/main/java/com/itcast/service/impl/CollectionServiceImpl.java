@@ -59,7 +59,8 @@ public class CollectionServiceImpl implements CollectionService {
         if (Boolean.TRUE.equals(isCollection)) {
             // 删除收藏
             LambdaQueryWrapper<Collection> queryWrapper = new LambdaQueryWrapper<Collection>()
-                    .eq(Collection::getNoteId, noteId);
+                    .eq(Collection::getNoteId, noteId)
+                    .eq(Collection::getUserId, userId);
             collectionMapper.delete(queryWrapper);
             // 更新redis
             redisTemplate.opsForValue().setBit(RedisConstant.COLLECTION_SET_CACHE + noteId, userId, false);
