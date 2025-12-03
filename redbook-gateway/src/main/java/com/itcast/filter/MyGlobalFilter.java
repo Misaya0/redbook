@@ -32,7 +32,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         // 2.判断是否是登录接口
         String path = request.getURI().getPath();
         log.info("请求接口为：{}", path);
-        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") || path.contains("/note/getNoteList")) {
+        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") || path.contains("/note/getNoteList") || path.contains("/user/uploads")) {
             log.info("请求接口放行");
             return chain.filter(exchange);
         }

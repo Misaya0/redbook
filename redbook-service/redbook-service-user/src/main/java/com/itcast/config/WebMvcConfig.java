@@ -22,10 +22,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/user/verify",
                         "/user/getAttention/**",
                         "/user/getUserById/**",
+                        "/user/uploads/**", // 放行图片访问
                         // Swagger / OpenAPI 相关路径放行
                         "/v3/api-docs/**",
                         "/swagger-ui.html",
                         "/swagger-ui/**"
                 );
+    }
+
+    @Override
+    public void addResourceHandlers(org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry registry) {
+        // 映射本地文件上传路径
+        String uploadPath = "file:" + System.getProperty("user.dir") + "/uploads/";
+        log.info("Configuring static resource handler for path: /user/uploads/** -> {}", uploadPath);
+        registry.addResourceHandler("/user/uploads/**")
+                .addResourceLocations(uploadPath);
     }
 }

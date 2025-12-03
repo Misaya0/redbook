@@ -1,6 +1,6 @@
 package com.itcast.client;
 
-import com.itcast.model.pojo.Attention;
+import com.itcast.model.vo.AttentionVo;
 import com.itcast.model.pojo.User;
 import com.itcast.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -16,5 +16,5 @@ public interface UserClient {
     Result<User> getUserById(@PathVariable("userId") Integer userId);
 
     @GetMapping("/user/getAttention/{userId}")
-    Result<List<Attention>> getAttention(@PathVariable("userId") Integer userId);
+    Result<List<AttentionVo>> getAttention(@PathVariable("userId") Integer userId);
 }

@@ -38,6 +38,6 @@ mybatis-plus:
       id-type: auto
 oss:
   endpoint: oss-cn-hangzhou.aliyuncs.com
-  accessKeyId: your-access-key-id
-  accessKeySecret: your-access-key-secret
+  accessKeyId: LTAI5t5b5R2GY5pPqWC9xJ2E
+  accessKeySecret: eqPcqet6nQnofWx6w7P2cBXQ49WA3x
   bucketName: your-bucket-name
