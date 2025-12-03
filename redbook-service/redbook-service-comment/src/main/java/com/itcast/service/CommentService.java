@@ -13,4 +13,8 @@ public interface CommentService {
     Result<List<CommentVo>> getCommentList(Long noteId) throws ParseException;
 
     Result<Integer> getCommentCount(Long noteId);
+
+    Result<Void> likeComment(Long commentId);
+
+    Result<Void> unlikeComment(Long commentId);
 }

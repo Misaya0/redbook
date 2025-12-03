@@ -42,4 +42,18 @@ public class CommentController {
         return commentService.getCommentCount(noteId);
     }
 
+    @Operation(summary = "点赞评论", description = "对指定评论进行点赞")
+    @PostMapping("/like/{commentId}")
+    public Result<Void> likeComment(
+            @Parameter(description = "评论ID", required = true) @PathVariable("commentId") Long commentId) {
+        return commentService.likeComment(commentId);
+    }
+
+    @Operation(summary = "取消点赞评论", description = "取消对指定评论的点赞")
+    @PostMapping("/unlike/{commentId}")
+    public Result<Void> unlikeComment(
+            @Parameter(description = "评论ID", required = true) @PathVariable("commentId") Long commentId) {
+        return commentService.unlikeComment(commentId);
+    }
+
 }

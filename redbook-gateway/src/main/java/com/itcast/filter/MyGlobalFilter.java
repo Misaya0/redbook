@@ -32,7 +32,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         // 2.判断是否是登录接口
         String path = request.getURI().getPath();
         log.info("请求接口为：{}", path);
-        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs")) {
+        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") || path.contains("/note/getNoteList")) {
             log.info("请求接口放行");
             return chain.filter(exchange);
         }
@@ -40,7 +40,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         String token = request.getHeaders().getFirst("token");
         // 4.判断token是否为空
         if (StringUtils.isBlank(token)) {
-            response.setStatusCode(HttpStatus.valueOf(ResponseEnum.UNAUTHORIZED.getCode()));
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return response.setComplete();
         }
         // 5.判断token是否过期
@@ -52,7 +52,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
             log.info("网关全局过滤器结束，userId: {}", userId);
             return chain.filter(modifiedExchange);
         } catch (TokenExpiredException | JWTDecodeException e2) {
-            response.setStatusCode(HttpStatus.valueOf(ResponseEnum.UNAUTHORIZED.getCode()));
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return response.setComplete();
         }
     }

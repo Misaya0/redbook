@@ -54,11 +54,30 @@ public class GetNoteList implements GetNotesStrategy {
         // 4.布隆过滤器过滤(过滤掉用户已经看过的笔记)
         Integer userId = UserContext.getUserId();
         List<NoteVo> noteVoList = noteList.stream()
-                .filter(note -> !bloomFilterUtil.mightContain(RedisConstant.USER_BLOOM_FILTER + userId, note.getId().toString()))
+                .filter(note -> {
+                    // 如果用户未登录，不过滤
+                    if (userId == null) {
+                        return true;
+                    }
+                    return !bloomFilterUtil.mightContain(RedisConstant.USER_BLOOM_FILTER + userId, note.getId().toString());
+                })
                 .map(note -> {
                     NoteVo noteVo = new NoteVo();
                     BeanUtils.copyProperties(note, noteVo);
-                    noteVo.setUser(userClient.getUserById(note.getUserId()).getData());
+                    
+                    // 安全地获取用户信息
+                    if (note.getUserId() != null) {
+                        try {
+                            Result<com.itcast.model.pojo.User> userResult = userClient.getUserById(note.getUserId());
+                            if (userResult != null && userResult.getData() != null) {
+                                noteVo.setUser(userResult.getData());
+                            }
+                        } catch (Exception e) {
+                            // 记录日志但不中断流程
+                            System.err.println("获取用户信息失败: " + e.getMessage());
+                        }
+                    }
+                    
                     return noteVo;
                 })
                 .collect(Collectors.toList());

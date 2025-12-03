@@ -29,4 +29,14 @@ public class CommentVo extends Comment {
      * 子评论列表
      */
     private List<CommentVo> childrenList;
+
+    /**
+     * 是否点赞
+     */
+    private Boolean isLiked;
+
+    /**
+     * 回复目标用户昵称
+     */
+    private String replyToUser;
 }
