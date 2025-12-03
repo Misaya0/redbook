@@ -1,0 +1,12 @@
+package com.itcast.model.vo;
+
+import lombok.Data;
+import java.io.Serializable;
+
+@Data
+public class AttentionVo implements Serializable {
+    private Integer userId;
+    private String nickname;
+    private String image;
+    private String time;
+}
