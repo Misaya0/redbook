@@ -100,17 +100,53 @@ public class NoteController {
             @Parameter(description = "笔记标题", required = true) @RequestParam("title") String title,
             @Parameter(description = "笔记内容", required = true) @RequestParam("content") String content,
             @Parameter(description = "经度", required = true) @RequestParam("longitude") String longitude,
-            @Parameter(description = "纬度", required = true) @RequestParam("latitude") String latitude) throws IOException, InterruptedException {
-        // 构造dto
+            @Parameter(description = "纬度", required = true) @RequestParam("latitude") String latitude,
+            @Parameter(description = "笔记类型", required = false) @RequestParam(value = "type", required = false) String type) throws IOException, InterruptedException {
         NoteDto dto = new NoteDto();
         dto.setFile(file);
         dto.setTitle(title);
         dto.setContent(content);
+        dto.setType(type);
         dto.setLongitude(Double.valueOf(longitude));
         dto.setLatitude(Double.valueOf(latitude));
         dto.setLike(0);
         dto.setCollection(0);
         return noteService.postNote(dto);
+    }
+
+    @Operation(summary = "更新笔记", description = "更新现有笔记的内容")
+    @PutMapping("/updateNote")
+    public Result<Void> updateNote(
+            @Parameter(description = "笔记ID", required = true) @RequestParam("id") Long id,
+            @Parameter(description = "笔记图片", required = false) @RequestParam(value = "image", required = false) MultipartFile file,
+            @Parameter(description = "笔记标题", required = true) @RequestParam("title") String title,
+            @Parameter(description = "笔记内容", required = true) @RequestParam("content") String content,
+            @Parameter(description = "笔记类型", required = false) @RequestParam(value = "type", required = false) String type,
+            @Parameter(description = "经度", required = false) @RequestParam(value = "longitude", required = false) String longitude,
+            @Parameter(description = "纬度", required = false) @RequestParam(value = "latitude", required = false) String latitude) throws IOException {
+        NoteDto dto = new NoteDto();
+        dto.setId(id);
+        dto.setFile(file);
+        dto.setTitle(title);
+        dto.setContent(content);
+        dto.setType(type);
+        if (longitude != null && !longitude.isEmpty()) dto.setLongitude(Double.valueOf(longitude));
+        if (latitude != null && !latitude.isEmpty()) dto.setLatitude(Double.valueOf(latitude));
+        return noteService.updateNote(dto);
+    }
+
+    @Operation(summary = "删除笔记", description = "根据笔记ID删除笔记")
+    @DeleteMapping("/deleteNote/{noteId}")
+    public Result<Void> deleteNote(
+            @Parameter(description = "笔记ID", required = true) @PathVariable("noteId") Long noteId) {
+        return noteService.deleteNote(noteId);
+    }
+
+    @Operation(summary = "批量删除笔记", description = "根据笔记ID列表批量删除笔记")
+    @DeleteMapping("/batchDeleteNotes")
+    public Result<Void> batchDeleteNotes(
+            @Parameter(description = "笔记ID列表", required = true) @RequestBody List<Long> noteIds) {
+        return noteService.batchDeleteNotes(noteIds);
     }
 }
 

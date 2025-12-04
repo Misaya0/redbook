@@ -16,4 +16,10 @@ public interface NoteService {
     Result<List<NoteVo>> getNotes(NoteStrategyType strategyType, NoteStrategyContext context);
 
     Result<Void> postNote(NoteDto dto) throws IOException, InterruptedException;
+
+    Result<Void> updateNote(NoteDto dto) throws IOException;
+
+    Result<Void> deleteNote(Long noteId);
+
+    Result<Void> batchDeleteNotes(List<Long> noteIds);
 }

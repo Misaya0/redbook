@@ -128,3 +128,36 @@ export const postNote = (formData) => {
     }
   })
 }
+
+/**
+ * 更新笔记
+ * @param {FormData} formData - 包含图片、标题、内容、ID等的表单数据
+ * @returns {Promise}
+ */
+export const updateNote = (formData) => {
+  return request.put('/note/updateNote', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
+ * 删除笔记
+ * @param {number} noteId - 笔记ID
+ * @returns {Promise}
+ */
+export const deleteNote = (noteId) => {
+  return request.delete(`/note/deleteNote/${noteId}`)
+}
+
+/**
+ * 批量删除笔记
+ * @param {Array<number>} noteIds - 笔记ID列表
+ * @returns {Promise}
+ */
+export const batchDeleteNotes = (noteIds) => {
+  return request.delete('/note/batchDeleteNotes', {
+    data: noteIds
+  })
+}

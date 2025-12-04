@@ -5,9 +5,9 @@
         <button class="back-btn" @click="handleBack">
           <span>←</span> 返回
         </button>
-        <h1 class="page-title">发布笔记</h1>
+        <h1 class="page-title">{{ isEditMode ? '编辑笔记' : '发布笔记' }}</h1>
         <button class="publish-submit-btn" @click="handlePublish" :disabled="!canPublish || publishing">
-          {{ publishing ? '发布中...' : '发布' }}
+          {{ publishing ? (isEditMode ? '保存中...' : '发布中...') : (isEditMode ? '保存' : '发布') }}
         </button>
       </div>
 
@@ -15,19 +15,25 @@
         <!-- 图片上传区域 -->
         <div class="image-upload-section">
           <div class="upload-label">
-            <span class="required">*</span> 上传图片
+            上传图片 <span class="optional-hint" style="color: #999; font-size: 14px; font-weight: normal;">（可选）</span>
           </div>
           <div class="image-upload-area">
-            <div v-if="!imagePreview" class="upload-placeholder" @click="triggerFileInput">
+            <div v-if="!imagePreview && !generatedPreview" class="upload-placeholder" @click="triggerFileInput">
               <div class="upload-icon">📷</div>
               <p class="upload-text">点击上传图片</p>
-              <p class="upload-hint">支持 JPG、PNG 格式，最大 10MB</p>
+              <p class="upload-hint">如不上传，将自动生成封面图片</p>
             </div>
             <div v-else class="image-preview-container">
-              <img :src="imagePreview" alt="预览图" class="image-preview" />
+              <img :src="imagePreview || generatedPreview" alt="预览图" class="image-preview" />
               <div class="image-actions">
-                <button class="change-image-btn" @click="triggerFileInput">更换图片</button>
-                <button class="remove-image-btn" @click="removeImage">删除图片</button>
+                <template v-if="imagePreview">
+                  <button class="change-image-btn" @click="triggerFileInput">更换图片</button>
+                  <button class="remove-image-btn" @click="removeImage">删除图片</button>
+                </template>
+                <template v-else>
+                  <button class="change-image-btn" @click="triggerFileInput">上传自定义图片</button>
+                  <button class="change-image-btn" @click="generateCoverImage">重新生成封面</button>
+                </template>
               </div>
             </div>
             <input
@@ -73,14 +79,14 @@
         <!-- 类型选择 -->
         <div class="form-group">
           <label class="form-label">
-            <span class="required">*</span> 类型
+            类型 <span class="optional-hint" style="color: #999; font-size: 14px; font-weight: normal;">（可选）</span>
           </label>
           <div class="type-options">
             <button
               v-for="type in noteTypes"
               :key="type.value"
               :class="['type-btn', { active: formData.type === type.value }]"
-              @click="formData.type = type.value"
+              @click="formData.type = formData.type === type.value ? '' : type.value"
             >
               <span class="type-icon">{{ type.icon }}</span>
               <span class="type-label">{{ type.label }}</span>
@@ -109,17 +115,22 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { postNote } from '@/api/note'
+import { postNote, updateNote, getNote } from '@/api/note'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
+
+const isEditMode = computed(() => !!route.query.id)
+const noteId = computed(() => route.query.id)
 
 const fileInput = ref(null)
 const imageFile = ref(null)
 const imagePreview = ref('')
+const generatedPreview = ref('')
 const publishing = ref(false)
 
 const formData = ref({
@@ -129,6 +140,30 @@ const formData = ref({
   address: '',
   longitude: '',
   latitude: ''
+})
+
+onMounted(async () => {
+  if (isEditMode.value) {
+    try {
+      const res = await getNote(noteId.value)
+      const note = res.data || res
+      if (note) {
+        formData.value.title = note.title || ''
+        formData.value.content = note.content || ''
+        formData.value.type = note.type || ''
+        formData.value.address = note.address || ''
+        formData.value.longitude = note.longitude ? String(note.longitude) : ''
+        formData.value.latitude = note.latitude ? String(note.latitude) : ''
+        
+        if (note.image) {
+          imagePreview.value = note.image
+        }
+      }
+    } catch (e) {
+      console.error('Load note failed', e)
+      alert('加载笔记失败')
+    }
+  }
 })
 
 const noteTypes = [
@@ -145,12 +180,88 @@ const noteTypes = [
 // 是否可以发布
 const canPublish = computed(() => {
   return (
-    imageFile.value &&
     formData.value.title.trim() &&
-    formData.value.content.trim() &&
-    formData.value.type
+    formData.value.content.trim()
   )
 })
+
+// 自动生成图片逻辑
+const generateCoverImage = () => {
+  const canvas = document.createElement('canvas')
+  const width = 600
+  const height = 800
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+
+  // 背景色
+  const colors = ['#F5F5F5', '#F8F9FA', '#FFF5F5', '#F5F9FF', '#F0FFF4', '#FFF9F0']
+  const color = colors[Math.floor(Math.random() * colors.length)]
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, width, height)
+
+  // 文字
+  ctx.fillStyle = '#000000'
+  ctx.font = 'bold 32px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  const text = formData.value.title.trim() || '无标题'
+  const maxWidth = width - 120 // 左右各60px边距
+  const words = text.split('')
+  let line = ''
+  let lines = []
+
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n]
+    const metrics = ctx.measureText(testLine)
+    const testWidth = metrics.width
+    if (testWidth > maxWidth && n > 0) {
+      lines.push(line)
+      line = words[n]
+    } else {
+      line = testLine
+    }
+  }
+  lines.push(line)
+
+  const lineHeight = 48
+  const startY = (height - (lines.length * lineHeight)) / 2
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], width / 2, startY + (i * lineHeight) + lineHeight / 2)
+  }
+
+  generatedPreview.value = canvas.toDataURL('image/jpeg', 0.8)
+}
+
+// 监听标题变化自动生成图片
+watch(() => formData.value.title, (newTitle) => {
+  if (!imageFile.value) {
+    if (newTitle.trim()) {
+      generateCoverImage()
+    } else {
+      generatedPreview.value = ''
+    }
+  }
+})
+
+// 监听图片文件变化
+watch(imageFile, (newFile) => {
+  if (!newFile && formData.value.title.trim()) {
+    generateCoverImage()
+  }
+})
+
+// DataURL转Blob
+const dataURLtoBlob = (dataurl) => {
+  let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+    bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 // 触发文件选择
 const triggerFileInput = () => {
@@ -231,22 +342,42 @@ const handlePublish = async () => {
 
   try {
     const formDataToSend = new FormData()
-    formDataToSend.append('image', imageFile.value)
+    
+    if (imageFile.value) {
+      formDataToSend.append('image', imageFile.value)
+    } else {
+      // 如果没有上传图片，且没有现有图片预览（针对编辑模式），则使用自动生成的图片
+      if (!imagePreview.value) {
+        if (!generatedPreview.value && formData.value.title.trim()) {
+          generateCoverImage()
+        }
+        if (generatedPreview.value) {
+          const blob = dataURLtoBlob(generatedPreview.value)
+          formDataToSend.append('image', blob, 'cover.jpg')
+        }
+      }
+    }
+
     formDataToSend.append('title', formData.value.title)
     formDataToSend.append('content', formData.value.content)
     formDataToSend.append('type', formData.value.type)
     formDataToSend.append('longitude', formData.value.longitude || '0')
     formDataToSend.append('latitude', formData.value.latitude || '0')
 
-    console.log('发布笔记:', {
-      title: formData.value.title,
-      content: formData.value.content,
-      type: formData.value.type
-    })
+    if (isEditMode.value) {
+      formDataToSend.append('id', noteId.value)
+      await updateNote(formDataToSend)
+      alert('修改成功！')
+    } else {
+      console.log('发布笔记:', {
+        title: formData.value.title,
+        content: formData.value.content,
+        type: formData.value.type
+      })
+      await postNote(formDataToSend)
+      alert('发布成功！')
+    }
 
-    await postNote(formDataToSend)
-
-    alert('发布成功！')
     router.push('/')
   } catch (error) {
     console.error('发布失败:', error)

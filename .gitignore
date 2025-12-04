@@ -39,3 +39,4 @@ buildNumber.properties
 *.iws
 *.ipr
 /redbook-fronted/node_modules/
+/uploads/

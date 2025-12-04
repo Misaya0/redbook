@@ -81,14 +81,24 @@
 
       <!-- 标签页 -->
       <div class="tabs-section">
-        <div class="tabs">
-          <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            :class="['tab-btn', { active: currentTab === tab.value }]"
-            @click="currentTab = tab.value"
+        <div class="tabs-header">
+          <div class="tabs">
+            <button
+              v-for="tab in tabs"
+              :key="tab.value"
+              :class="['tab-btn', { active: currentTab === tab.value }]"
+              @click="handleTabChange(tab.value)"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+          
+          <button 
+            v-if="currentTab === 'notes'" 
+            class="manage-btn" 
+            @click="toggleManagementMode"
           >
-            {{ tab.label }}
+            {{ isManagementMode ? '退出管理' : '笔记管理' }}
           </button>
         </div>
 
@@ -100,19 +110,67 @@
           </div>
 
           <!-- 笔记列表 -->
-          <div v-else-if="currentTab === 'notes'" class="notes-grid">
-            <div v-if="notesList.length === 0" class="empty-tip">
-              <div class="empty-icon">📝</div>
-              <p>还没有发布笔记</p>
-            </div>
-            <div v-else class="posts-grid">
-              <PostCard
-                v-for="note in notesList"
-                :key="note.id"
-                :post="note"
-                @click="handleNoteClick"
-              />
-            </div>
+          <div v-else-if="currentTab === 'notes'" class="notes-container">
+            <transition name="fade" mode="out-in">
+              <!-- 普通视图 -->
+              <div v-if="!isManagementMode" key="normal" class="notes-grid">
+                <div v-if="notesList.length === 0" class="empty-tip">
+                  <div class="empty-icon">📝</div>
+                  <p>还没有发布笔记</p>
+                </div>
+                <div v-else class="posts-grid">
+                  <PostCard
+                    v-for="note in notesList"
+                    :key="note.id"
+                    :post="note"
+                    @click="handleNoteClick"
+                  />
+                </div>
+              </div>
+
+              <!-- 管理视图 -->
+              <div v-else key="management" class="management-list">
+                <div v-if="notesList.length === 0" class="empty-tip">
+                  <div class="empty-icon">📝</div>
+                  <p>还没有发布笔记</p>
+                </div>
+                <div v-else class="management-items">
+                  <div v-for="note in notesList" :key="note.id" class="management-item">
+                    <!-- 左侧：缩略图 -->
+                    <div class="item-left">
+                      <img :src="note.image" class="item-thumb" alt="笔记缩略图" />
+                    </div>
+                    
+                    <!-- 中间：信息 -->
+                    <div class="item-center">
+                      <h3 class="item-title">{{ note.title }}</h3>
+                      <p class="item-time">{{ note.time }}</p>
+                      <div class="item-stats">
+                        <span class="stat-unit">
+                          <span class="icon">💬</span> {{ note.comments }}
+                        </span>
+                        <span class="stat-unit">
+                          <span class="icon">❤️</span> {{ note.likes }}
+                        </span>
+                        <span class="stat-unit">
+                          <span class="icon">⭐</span> {{ note.collects }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- 右侧：操作 -->
+                    <div class="item-right">
+                      <button class="action-btn edit" @click.stop="handleEditNote(note)">
+                        <span class="action-icon">✏️</span> 编辑
+                      </button>
+                      <button class="action-btn delete" @click.stop="handleDeleteNote(note)">
+                        <span class="action-icon">🗑️</span> 删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </transition>
           </div>
 
           <!-- 点赞列表 -->
@@ -258,7 +316,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getUserInfo, getAttentionList, getFansList, updateUserImage, editUserInfo } from '@/api/user'
-import { getNoteListByOwn, getNoteByLike, getNoteByCollection } from '@/api/note'
+import { getNoteListByOwn, getNoteByLike, getNoteByCollection, deleteNote } from '@/api/note'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 
@@ -272,6 +330,7 @@ const attentionCount = ref(0)
 const fansCount = ref(0)
 const likeCount = ref(0)
 const currentTab = ref('notes')
+const isManagementMode = ref(false)
 const tabLoading = ref(false)
 
 // 笔记、点赞、收藏列表
@@ -626,6 +685,47 @@ const handleNoteClick = (note) => {
   showNoteDetail.value = true
 }
 
+// 切换标签
+const handleTabChange = (tabValue) => {
+  currentTab.value = tabValue
+  isManagementMode.value = false
+}
+
+// 切换管理模式
+const toggleManagementMode = () => {
+  isManagementMode.value = !isManagementMode.value
+}
+
+// 编辑笔记
+const handleEditNote = (note) => {
+  console.log('Edit note:', note)
+  router.push({ 
+    path: '/publish', 
+    query: { id: note.id } 
+  })
+}
+
+// 删除笔记
+const handleDeleteNote = async (note) => {
+  if (!confirm('确定要删除这条笔记吗？')) {
+    return
+  }
+  
+  try {
+    await deleteNote(note.id)
+    showToast('删除成功')
+    
+    // 从列表中移除
+    notesList.value = notesList.value.filter(item => item.id !== note.id)
+    
+    // 也可以重新加载列表
+    // loadNotes()
+  } catch (error) {
+    console.error('删除失败:', error)
+    showToast('删除失败: ' + (error.message || '未知错误'))
+  }
+}
+
 // 监听标签切换
 watch(currentTab, (newTab) => {
   if (newTab === 'notes' && notesList.value.length === 0) {
@@ -878,11 +978,18 @@ onMounted(() => {
   min-height: 400px;
 }
 
+.tabs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
+  padding-right: 10px;
+}
+
 .tabs {
   display: flex;
   gap: 30px;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 20px;
 }
 
 .tab-btn {
@@ -909,6 +1016,156 @@ onMounted(() => {
   width: 100%;
   height: 2px;
   background: #ff2442;
+}
+
+.manage-btn {
+  padding: 0 20px;
+  background: white;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 22px; /* Rounded pill shape */
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  height: 44px; /* Meets 44px touch target requirement */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manage-btn:hover {
+  color: #ff2442;
+  border-color: #ff2442;
+  background: #fff5f6;
+}
+
+/* Management List Styles */
+.management-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.management-items {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.management-item {
+  display: flex;
+  padding: 15px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.management-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+.item-left {
+  flex-shrink: 0;
+  margin-right: 20px;
+}
+
+.item-thumb {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.item-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.item-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.item-time {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.item-stats {
+  display: flex;
+  gap: 20px;
+  margin-top: auto;
+}
+
+.stat-unit {
+  font-size: 14px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 15px;
+  margin-left: 20px;
+  padding-left: 20px;
+  border-left: 1px solid #f5f5f5;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  min-width: 90px;
+  justify-content: center;
+}
+
+.action-btn.edit {
+  background: #f0f8ff;
+  color: #007bff;
+}
+
+.action-btn.edit:hover {
+  background: #e6f2ff;
+}
+
+.action-btn.delete {
+  background: #fff0f0;
+  color: #ff4d4f;
+}
+
+.action-btn.delete:hover {
+  background: #ffe6e6;
+}
+
+/* Transition Styles */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 .posts-grid {

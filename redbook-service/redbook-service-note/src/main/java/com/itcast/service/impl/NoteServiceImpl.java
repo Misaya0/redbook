@@ -43,6 +43,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.itcast.util.LocalFileUtil;
+import com.itcast.model.pojo.NoteEs;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @Slf4j
 public class NoteServiceImpl implements NoteService {
@@ -64,6 +69,12 @@ public class NoteServiceImpl implements NoteService {
 
     @Autowired
     private BloomFilterUtil bloomFilterUtil;
+    
+    @Autowired
+    private LocalFileUtil localFileUtil;
+    
+    @Autowired
+    private ElasticsearchOperations elasticsearchOperations;
 
     private static final Lock lock = new ReentrantLock();
 
@@ -217,6 +228,132 @@ public class NoteServiceImpl implements NoteService {
         }
 
         return Result.failure("发布笔记失败");
+}
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> updateNote(NoteDto dto) throws java.io.IOException {
+        // 1. 检查笔记是否存在
+        Note note = noteMapper.selectById(dto.getId());
+        if (note == null) {
+            throw new NoteNoExistException(ExceptionConstant.NOTE_NO_EXIST);
+        }
+
+        // 2. 权限校验
+        Integer userId = UserContext.getUserId();
+        if (!note.getUserId().equals(userId)) {
+            return Result.failure("无权修改此笔记");
+        }
+
+        // 3. 如果有新图片，上传并更新
+        if (dto.getFile() != null && !dto.getFile().isEmpty()) {
+            String path = localFileUtil.uploadImg(dto.getFile().getBytes());
+            note.setImage(path);
+        }
+
+        // 4. 更新字段
+        note.setTitle(dto.getTitle());
+        note.setContent(dto.getContent());
+        if (StringUtils.isNotBlank(dto.getType())) {
+            note.setType(dto.getType());
+        }
+        if (dto.getLongitude() != null) note.setLongitude(dto.getLongitude());
+        if (dto.getLatitude() != null) note.setLatitude(dto.getLatitude());
+
+        // 5. 更新数据库
+        noteMapper.updateById(note);
+
+        // 6. 更新缓存
+        redisTemplate.delete(RedisConstant.NOTE_DETAIL_CACHE + note.getId());
+        Cache noteCache = cacheManager.getCache("noteCache");
+        if (noteCache != null) {
+            noteCache.evict(note.getId());
+        }
+
+        // 7. 更新 ES
+        try {
+            NoteEs noteEs = new NoteEs();
+            BeanUtils.copyProperties(note, noteEs);
+            noteEs.setId(Math.toIntExact(note.getId()));
+            elasticsearchOperations.save(noteEs);
+        } catch (Exception e) {
+            log.error("ES更新失败", e);
+        }
+
+        return Result.success(null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> deleteNote(Long noteId) {
+        // 1. 检查笔记是否存在
+        Note note = noteMapper.selectById(noteId);
+        if (note == null) {
+            throw new NoteNoExistException(ExceptionConstant.NOTE_NO_EXIST);
+        }
+
+        // 2. 权限校验
+        Integer userId = UserContext.getUserId();
+        if (!note.getUserId().equals(userId)) {
+            return Result.failure("无权删除此笔记");
+        }
+
+        // 3. 删除数据库
+        noteMapper.deleteById(noteId);
+
+        // 4. 删除缓存
+        redisTemplate.delete(RedisConstant.NOTE_DETAIL_CACHE + noteId);
+        Cache noteCache = cacheManager.getCache("noteCache");
+        if (noteCache != null) {
+            noteCache.evict(noteId);
+        }
+
+        // 5. 删除 ES
+        try {
+            elasticsearchOperations.delete(String.valueOf(noteId), NoteEs.class);
+        } catch (Exception e) {
+            log.error("ES删除失败", e);
+        }
+
+        return Result.success(null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> batchDeleteNotes(List<Long> noteIds) {
+        if (noteIds == null || noteIds.isEmpty()) {
+            return Result.success(null);
+        }
+
+        Integer userId = UserContext.getUserId();
+
+        // 1. 校验所有笔记权限
+        List<Note> notes = noteMapper.selectBatchIds(noteIds);
+
+        for (Note note : notes) {
+            if (!note.getUserId().equals(userId)) {
+                return Result.failure("包含无权删除的笔记: " + note.getTitle());
+            }
+        }
+
+        // 2. 批量删除数据库
+        noteMapper.deleteBatchIds(noteIds);
+
+        // 3. 删除缓存和ES
+        Cache noteCache = cacheManager.getCache("noteCache");
+        for (Long id : noteIds) {
+            redisTemplate.delete(RedisConstant.NOTE_DETAIL_CACHE + id);
+            if (noteCache != null) {
+                noteCache.evict(id);
+            }
+            try {
+                elasticsearchOperations.delete(String.valueOf(id), NoteEs.class);
+            } catch (Exception e) {
+                log.error("ES删除失败 for id: " + id, e);
+            }
+        }
+
+        return Result.success(null);
     }
 }
 
