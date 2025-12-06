@@ -54,4 +54,13 @@ public class ProductController {
             @Parameter(description = "商品信息", required = true) @RequestBody Product product) {
         return productService.updateProduct(product);
     }
+
+    @Operation(summary = "搜索商品", description = "按名称、价格搜索商品")
+    @GetMapping("/search")
+    public Result<List<Product>> search(
+            @Parameter(description = "关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "最低价") @RequestParam(required = false) Double minPrice,
+            @Parameter(description = "最高价") @RequestParam(required = false) Double maxPrice) {
+        return productService.searchProduct(keyword, minPrice, maxPrice);
+    }
 }

@@ -78,7 +78,8 @@ const tabs = [
   { label: '旅行', value: '旅行' },
   { label: '搞笑', value: '搞笑' },
   { label: '音乐', value: '音乐' },
-  { label: '职场', value: '职场' }
+  { label: '职场', value: '职场' },
+  { label: '其他', value: '其他' }
 ]
 
 // 转换后端数据为前端需要的格式

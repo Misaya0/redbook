@@ -4,6 +4,7 @@ import Follow from '@/views/Follow.vue'
 import Login from '@/views/Login.vue'
 import Profile from '@/views/Profile.vue'
 import Publish from '@/views/Publish.vue'
+import Search from '@/views/Search.vue'
 
 const routes = [
   {
@@ -38,6 +39,11 @@ const routes = [
     name: 'Publish',
     component: Publish,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/search',
+    name: 'Search',
+    component: Search
   }
 ]
 

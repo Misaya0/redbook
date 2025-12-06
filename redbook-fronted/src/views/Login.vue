@@ -89,6 +89,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { useModal } from '@/utils/modal'
 
 // 手机号相关
 const phonePrefix = ref('+86')
@@ -98,6 +99,7 @@ const phoneError = ref('')
 // 使用路由和用户状态
 const router = useRouter()
 const userStore = useUserStore()
+const { showAlert } = useModal()
 
 // 验证码相关
 const verifyCode = ref('')
@@ -143,13 +145,17 @@ const sendVerifyCode = async () => {
     const result = await userStore.sendVerifyCode(phonePrefix.value + phoneNumber.value)
 
     if (result.success) {
-      alert(result.message)
+      await showAlert(result.message, '成功')
       startCountDown()
     } else {
-      alert(result.message)
+      if (!result.isHandled) {
+        await showAlert(result.message, '错误')
+      }
     }
   } catch (error) {
-    alert('发送失败，请重试')
+    if (!error.isHandled) {
+      await showAlert('发送失败，请重试', '错误')
+    }
   } finally {
     sendingCode.value = false
   }
@@ -193,16 +199,20 @@ const handleLogin = async () => {
     console.log('登录结果:', result)
 
     if (result.success) {
-      alert(result.message)
+      await showAlert(result.message, '欢迎')
       resetForm()
       // 返回首页
       router.push('/')
     } else {
-      alert(result.message)
+      if (!result.isHandled) {
+        await showAlert(result.message, '登录失败')
+      }
     }
   } catch (error) {
     console.error('登录错误:', error)
-    alert('登录失败，请检查验证码')
+    if (!error.isHandled) {
+      await showAlert('登录失败，请检查验证码', '错误')
+    }
   } finally {
     loggingIn.value = false
   }
@@ -223,12 +233,12 @@ const goBack = () => {
 }
 
 // 其他登录方式
-const wechatLogin = () => {
-  alert('微信登录功能开发中...')
+const wechatLogin = async () => {
+  await showAlert('微信登录功能开发中...', '提示')
 }
 
-const qqLogin = () => {
-  alert('QQ登录功能开发中...')
+const qqLogin = async () => {
+  await showAlert('QQ登录功能开发中...', '提示')
 }
 
 // 验证输入
@@ -399,23 +409,17 @@ watch([phoneNumber, verifyCode], validateInput)
 }
 
 .login-tips {
-  margin-top: 24px;
+  margin-top: 20px;
   text-align: center;
-}
-
-.login-tips p {
-  color: #999;
   font-size: 12px;
-  margin-bottom: 4px;
+  color: #999;
+  line-height: 1.5;
 }
 
 .link {
-  color: #ff2442;
+  color: #333;
   text-decoration: none;
-}
-
-.link:hover {
-  text-decoration: underline;
+  font-weight: 500;
 }
 
 .other-login-methods {
@@ -424,45 +428,47 @@ watch([phoneNumber, verifyCode], validateInput)
 
 .divider {
   text-align: center;
-  color: #ccc;
-  font-size: 12px;
+  position: relative;
   margin-bottom: 20px;
-  position: relative;
-}
-
-.divider span {
-  background: white;
-  padding: 0 10px;
-  position: relative;
 }
 
 .divider::before {
   content: '';
   position: absolute;
-  top: 50%;
   left: 0;
-  right: 0;
+  top: 50%;
+  width: 100%;
   height: 1px;
-  background: #e5e5e5;
+  background: #eee;
+}
+
+.divider span {
+  background: white;
+  padding: 0 10px;
+  color: #999;
+  font-size: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .social-login {
   display: flex;
-  gap: 15px;
   justify-content: center;
+  gap: 20px;
 }
 
 .social-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 6px;
+  padding: 8px 16px;
   border: 1px solid #e5e5e5;
-  border-radius: 8px;
+  border-radius: 20px;
   background: white;
+  font-size: 14px;
+  color: #666;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 14px;
 }
 
 .social-btn:hover {
@@ -470,77 +476,39 @@ watch([phoneNumber, verifyCode], validateInput)
   color: #ff2442;
 }
 
-.social-btn.wechat:hover {
-  border-color: #07c160;
-  color: #07c160;
-}
-
-.social-btn.qq:hover {
-  border-color: #12b7f5;
-  color: #12b7f5;
-}
-
 .icon {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  color: white;
   font-weight: bold;
 }
 
 .wechat .icon {
   background: #07c160;
-  color: white;
 }
 
 .qq .icon {
   background: #12b7f5;
-  color: white;
 }
 
 .back-to-home {
   margin-top: 30px;
-  text-align: center;
 }
 
 .back-btn {
-  padding: 10px 20px;
   background: none;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  color: #666;
+  border: none;
+  color: #999;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
 .back-btn:hover {
-  border-color: #ff2442;
-  color: #ff2442;
-}
-
-@media (max-width: 480px) {
-  .login-form-container {
-    padding: 30px 20px;
-  }
-
-  .phone-input-group,
-  .verify-group {
-    flex-direction: column;
-  }
-
-  .phone-prefix {
-    width: 100%;
-  }
-
-  .send-code-btn {
-    width: 100%;
-  }
-
-  .social-login {
-    flex-direction: column;
-  }
+  color: #666;
 }
 </style>

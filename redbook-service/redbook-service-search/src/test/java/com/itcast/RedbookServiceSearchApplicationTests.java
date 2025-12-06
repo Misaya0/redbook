@@ -19,4 +19,5 @@ class RedbookServiceSearchApplicationTests {
         Set<Object> hots = redisTemplate.opsForZSet().reverseRange(RedisConstant.NOTE_SCORE, 0, 9);
     }
 
+
 }

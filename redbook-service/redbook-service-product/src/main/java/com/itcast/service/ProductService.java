@@ -17,4 +17,6 @@ public interface ProductService {
     Result<Void> postProduct(ProductDto productDto);
 
     Result<Void> updateProduct(Product product);
+
+    Result<List<Product>> searchProduct(String keyword, Double minPrice, Double maxPrice);
 }

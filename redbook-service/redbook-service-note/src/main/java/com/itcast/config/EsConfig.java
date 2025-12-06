@@ -11,4 +11,5 @@ import org.springframework.context.annotation.Configuration;
 public class EsConfig {
     // Spring Data Elasticsearch 会自动配置 ElasticsearchOperations 和 ElasticsearchRestTemplate
     // 无需手动创建 RestHighLevelClient
+
 }

@@ -52,11 +52,34 @@ class RedbookServiceNoteApplicationTests {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+//    @Test
+//    void testMybatisPlus() {
+//        Page<Note> page = new Page<>(1, 1);
+//        page = noteMapper.selectPage(page, null);
+//        System.out.println(page.getRecords());
+//    }
+
     @Test
-    void testMybatisPlus() {
-        Page<Note> page = new Page<>(1, 1);
-        page = noteMapper.selectPage(page, null);
-        System.out.println(page.getRecords());
+    void testRedisConnection() {
+        // 1. 设置一个 Key
+        String key = "test:connection";
+        String value = "Hello Redis " + System.currentTimeMillis();
+        redisTemplate.opsForValue().set(key, value);
+        log.info("Set Redis key: {} = {}", key, value);
+
+        // 2. 获取这个 Key
+        Object retrievedValue = redisTemplate.opsForValue().get(key);
+        log.info("Get Redis key: {} = {}", key, retrievedValue);
+
+        // 3. 验证值是否相等
+        if (value.equals(retrievedValue)) {
+            log.info("Redis connection test PASSED!");
+        } else {
+            log.error("Redis connection test FAILED! Expected: {}, but got: {}", value, retrievedValue);
+        }
+
+        // 4. 清理 Key
+        redisTemplate.delete(key);
     }
 
     @Test

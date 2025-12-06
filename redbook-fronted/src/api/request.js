@@ -1,5 +1,15 @@
 import axios from 'axios'
 import { API_CONFIG, getFullUrl } from './config'
+import { useModal } from '../utils/modal'
+
+// 获取modal实例
+const { showAlert } = useModal()
+
+const rejectWithAlert = (message) => {
+  const error = new Error(message)
+  error.isHandled = true
+  return Promise.reject(error)
+}
 
 // 创建axios实例
 const request = axios.create({
@@ -28,7 +38,7 @@ request.interceptors.request.use(
 
 // 响应拦截器
 request.interceptors.response.use(
-  (response) => {
+  async (response) => {
     // 统一处理响应数据
     const { data } = response
 
@@ -37,10 +47,11 @@ request.interceptors.response.use(
       return data.data
     } else {
       // 统一错误处理
-      return Promise.reject(new Error(data.message || '请求失败'))
+      await showAlert(data.message || '请求失败', '错误')
+      return rejectWithAlert(data.message || '请求失败')
     }
   },
-  (error) => {
+  async (error) => {
     // 统一错误处理
     if (error.response) {
       // 服务器响应错误
@@ -48,27 +59,35 @@ request.interceptors.response.use(
 
       switch (status) {
         case 400:
-          return Promise.reject(new Error(data.message || '请求参数错误'))
+          await showAlert(data.message || '请求参数错误', '错误')
+          return rejectWithAlert(data.message || '请求参数错误')
         case 401:
           // 清除token，跳转到登录页
           localStorage.removeItem('token')
+          await showAlert('登录已过期，请重新登录', '提示')
           window.location.href = '/login'
-          return Promise.reject(new Error('登录已过期，请重新登录'))
+          return rejectWithAlert('登录已过期，请重新登录')
         case 403:
-          return Promise.reject(new Error('没有权限访问'))
+          await showAlert('没有权限访问', '错误')
+          return rejectWithAlert('没有权限访问')
         case 404:
-          return Promise.reject(new Error('请求的资源不存在'))
+          await showAlert('请求的资源不存在', '错误')
+          return rejectWithAlert('请求的资源不存在')
         case 500:
-          return Promise.reject(new Error('服务器内部错误'))
+          await showAlert('服务器内部错误', '错误')
+          return rejectWithAlert('服务器内部错误')
         default:
-          return Promise.reject(new Error(data.message || '服务器错误'))
+          await showAlert(data.message || '服务器错误', '错误')
+          return rejectWithAlert(data.message || '服务器错误')
       }
     } else if (error.request) {
       // 请求发送失败
-      return Promise.reject(new Error('网络连接失败，请检查网络'))
+      await showAlert('网络连接失败，请检查网络', '错误')
+      return rejectWithAlert('网络连接失败，请检查网络')
     } else {
       // 其他错误
-      return Promise.reject(new Error(error.message || '请求失败'))
+      await showAlert(error.message || '请求失败', '错误')
+      return rejectWithAlert(error.message || '请求失败')
     }
   }
 )

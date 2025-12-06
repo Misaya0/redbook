@@ -317,11 +317,13 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getUserInfo, getAttentionList, getFansList, updateUserImage, editUserInfo } from '@/api/user'
 import { getNoteListByOwn, getNoteByLike, getNoteByCollection, deleteNote } from '@/api/note'
+import { useModal } from '@/utils/modal'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { showConfirm } = useModal()
 
 const loading = ref(false)
 const error = ref('')
@@ -532,7 +534,9 @@ const handleFileChange = async (event) => {
     
   } catch (error) {
     console.error('上传头像失败:', error)
-    showToast('上传头像失败，请重试')
+    if (!error.isHandled) {
+      showToast('上传头像失败，请重试')
+    }
   }
 }
 
@@ -564,7 +568,9 @@ const handleSaveProfile = async () => {
     
   } catch (error) {
     console.error('保存资料失败:', error)
-    showToast('保存失败: ' + (error.message || '未知错误'))
+    if (!error.isHandled) {
+      showToast('保存失败: ' + (error.message || '未知错误'))
+    }
   } finally {
     editLoading.value = false
   }
@@ -707,7 +713,8 @@ const handleEditNote = (note) => {
 
 // 删除笔记
 const handleDeleteNote = async (note) => {
-  if (!confirm('确定要删除这条笔记吗？')) {
+  const confirmed = await showConfirm('确定要删除这条笔记吗？', '删除确认')
+  if (!confirmed) {
     return
   }
   
@@ -722,7 +729,9 @@ const handleDeleteNote = async (note) => {
     // loadNotes()
   } catch (error) {
     console.error('删除失败:', error)
-    showToast('删除失败: ' + (error.message || '未知错误'))
+    if (!error.isHandled) {
+      showToast('删除失败: ' + (error.message || '未知错误'))
+    }
   }
 }
 

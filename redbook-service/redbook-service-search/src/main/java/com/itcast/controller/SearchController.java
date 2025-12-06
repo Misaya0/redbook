@@ -7,10 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,5 +25,22 @@ public class SearchController {
     public Result<List<NoteVo>> search(
             @Parameter(description = "搜索关键词", required = true) @PathVariable String key) throws IOException {
         return searchService.search(key);
+    }
+
+    @Operation(summary = "综合搜索", description = "根据关键词、类型、分页参数搜索")
+    @GetMapping("/all")
+    public Result<Object> searchAll(
+            @Parameter(description = "关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "类型(0-笔记, 1-用户, 2-商品)") @RequestParam(required = false, defaultValue = "0") Integer type,
+            @Parameter(description = "页码") @RequestParam(required = false, defaultValue = "1") Integer page,
+            @Parameter(description = "页大小") @RequestParam(required = false, defaultValue = "10") Integer size) throws IOException {
+        return searchService.searchAll(keyword, type, page, size);
+    }
+
+    @Operation(summary = "搜索建议", description = "根据关键词获取搜索建议")
+    @GetMapping("/suggest")
+    public Result<List<String>> suggest(
+            @Parameter(description = "关键词") @RequestParam String keyword) throws IOException {
+        return searchService.suggest(keyword);
     }
 }

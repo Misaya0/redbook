@@ -119,10 +119,12 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { postNote, updateNote, getNote } from '@/api/note'
+import { useModal } from '@/utils/modal'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { showAlert, showConfirm } = useModal()
 
 const isEditMode = computed(() => !!route.query.id)
 const noteId = computed(() => route.query.id)
@@ -161,7 +163,9 @@ onMounted(async () => {
       }
     } catch (e) {
       console.error('Load note failed', e)
-      alert('加载笔记失败')
+      if (!e.isHandled) {
+        await showAlert('加载笔记失败', '错误')
+      }
     }
   }
 })
@@ -269,19 +273,19 @@ const triggerFileInput = () => {
 }
 
 // 处理文件选择
-const handleFileChange = (event) => {
+const handleFileChange = async (event) => {
   const file = event.target.files[0]
   if (!file) return
 
   // 验证文件类型
   if (!file.type.match(/^image\/(jpeg|png|jpg)$/)) {
-    alert('只支持 JPG、PNG 格式的图片')
+    await showAlert('只支持 JPG、PNG 格式的图片', '格式错误')
     return
   }
 
   // 验证文件大小（10MB）
   if (file.size > 10 * 1024 * 1024) {
-    alert('图片大小不能超过 10MB')
+    await showAlert('图片大小不能超过 10MB', '文件过大')
     return
   }
 
@@ -307,7 +311,7 @@ const removeImage = () => {
 // 获取位置
 const getLocation = () => {
   if (!navigator.geolocation) {
-    alert('您的浏览器不支持地理定位')
+    showAlert('您的浏览器不支持地理定位', '定位失败')
     return
   }
 
@@ -316,11 +320,11 @@ const getLocation = () => {
       formData.value.longitude = position.coords.longitude.toString()
       formData.value.latitude = position.coords.latitude.toString()
       formData.value.address = `经度: ${position.coords.longitude.toFixed(6)}, 纬度: ${position.coords.latitude.toFixed(6)}`
-      alert('位置获取成功')
+      showAlert('位置获取成功', '成功')
     },
     (error) => {
       console.error('获取位置失败:', error)
-      alert('获取位置失败，请手动输入')
+      showAlert('获取位置失败，请手动输入', '定位失败')
     }
   )
 }
@@ -328,13 +332,13 @@ const getLocation = () => {
 // 发布笔记
 const handlePublish = async () => {
   if (!userStore.isLoggedIn) {
-    alert('请先登录')
+    await showAlert('请先登录', '提示')
     router.push('/login')
     return
   }
 
   if (!canPublish.value) {
-    alert('请填写完整信息')
+    await showAlert('请填写完整信息', '提示')
     return
   }
 
@@ -367,7 +371,7 @@ const handlePublish = async () => {
     if (isEditMode.value) {
       formDataToSend.append('id', noteId.value)
       await updateNote(formDataToSend)
-      alert('修改成功！')
+      await showAlert('修改成功！', '成功')
     } else {
       console.log('发布笔记:', {
         title: formData.value.title,
@@ -375,22 +379,25 @@ const handlePublish = async () => {
         type: formData.value.type
       })
       await postNote(formDataToSend)
-      alert('发布成功！')
+      await showAlert('发布成功！', '成功')
     }
 
     router.push('/')
   } catch (error) {
     console.error('发布失败:', error)
-    alert(error.message || '发布失败，请稍后重试')
+    if (!error.isHandled) {
+      await showAlert(error.message || '发布失败，请稍后重试', '错误')
+    }
   } finally {
     publishing.value = false
   }
 }
 
 // 返回
-const handleBack = () => {
+const handleBack = async () => {
   if (formData.value.title || formData.value.content || imageFile.value) {
-    if (confirm('确定要放弃编辑吗？')) {
+    const confirmed = await showConfirm('确定要放弃编辑吗？', '确认')
+    if (confirmed) {
       router.back()
     }
   } else {
@@ -402,90 +409,163 @@ const handleBack = () => {
 <style scoped>
 .publish-container {
   min-height: 100vh;
-  background: #f5f5f5;
-  padding: 80px 20px 20px;
+  background-color: #fff;
+  padding-bottom: 50px;
 }
 
 .publish-content {
   max-width: 800px;
   margin: 0 auto;
+  padding: 20px;
+  margin-top: 20px;
 }
 
 .publish-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 30px;
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 10px 0;
+  margin-bottom: 20px;
 }
 
 .back-btn {
+  border: none;
+  background: none;
+  font-size: 16px;
+  color: #333;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #f5f5f5;
-  border: none;
-  border-radius: 8px;
-  color: #666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.back-btn:hover {
-  background: #e5e5e5;
-  color: #333;
+  gap: 5px;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 600;
   color: #333;
+  margin: 0;
 }
 
 .publish-submit-btn {
-  padding: 10px 32px;
-  background: #ff2442;
-  color: white;
+  background-color: #ff2442;
+  color: #fff;
   border: none;
+  padding: 8px 20px;
   border-radius: 20px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.publish-submit-btn:hover:not(:disabled) {
-  background: #e01e3a;
-  transform: translateY(-1px);
+  transition: background-color 0.3s;
 }
 
 .publish-submit-btn:disabled {
-  background: #ccc;
+  background-color: #ffb3c0;
   cursor: not-allowed;
-  transform: none;
 }
 
 .publish-form {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.image-upload-section {
-  margin-bottom: 30px;
+.image-upload-area {
+  width: 100%;
+  min-height: 200px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px dashed #ddd;
+  transition: all 0.3s;
+  overflow: hidden;
+  position: relative;
 }
 
-.upload-label {
-  font-size: 16px;
+.image-upload-area:hover {
+  border-color: #ff2442;
+  background-color: #fff5f7;
+}
+
+.upload-placeholder {
+  text-align: center;
+  color: #999;
+}
+
+.upload-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.image-preview-container {
+  width: 100%;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  background: #000;
+}
+
+.image-preview {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  display: block;
+}
+
+.image-actions {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.5);
+  padding: 10px;
+}
+
+.change-image-btn, .remove-image-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+}
+
+.change-image-btn {
+  background: #fff;
+  color: #333;
+}
+
+.remove-image-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid #fff;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 14px;
   font-weight: 500;
   color: #333;
-  margin-bottom: 12px;
 }
 
 .required {
@@ -493,135 +573,25 @@ const handleBack = () => {
   margin-right: 4px;
 }
 
-.image-upload-area {
+.form-input, .form-textarea {
   width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  transition: border-color 0.3s;
+  box-sizing: border-box;
 }
 
-.upload-placeholder {
-  width: 100%;
-  height: 300px;
-  border: 2px dashed #ddd;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.upload-placeholder:hover {
+.form-input:focus, .form-textarea:focus {
   border-color: #ff2442;
-  background: #fef5f5;
-}
-
-.upload-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.upload-text {
-  font-size: 16px;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.upload-hint {
-  font-size: 14px;
-  color: #999;
-}
-
-.image-preview-container {
-  position: relative;
-}
-
-.image-preview {
-  width: 100%;
-  max-height: 500px;
-  object-fit: contain;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.image-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.change-image-btn,
-.remove-image-btn {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.change-image-btn {
-  background: #f5f5f5;
-  color: #333;
-}
-
-.change-image-btn:hover {
-  background: #e5e5e5;
-}
-
-.remove-image-btn {
-  background: #fff;
-  color: #ff2442;
-  border: 1px solid #ff2442;
-}
-
-.remove-image-btn:hover {
-  background: #ff2442;
-  color: white;
-}
-
-.form-group {
-  margin-bottom: 24px;
-}
-
-.form-label {
-  display: block;
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 12px;
-}
-
-.form-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  font-size: 14px;
   outline: none;
-  transition: all 0.3s ease;
-}
-
-.form-input:focus {
-  border-color: #ff2442;
-  box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.1);
 }
 
 .form-textarea {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
   resize: vertical;
-  font-family: inherit;
-  transition: all 0.3s ease;
-}
-
-.form-textarea:focus {
-  border-color: #ff2442;
-  box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.1);
+  min-height: 120px;
 }
 
 .char-count {
@@ -632,108 +602,49 @@ const handleBack = () => {
 }
 
 .type-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .type-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
-  background: #f5f5f5;
-  border: 2px solid transparent;
-  border-radius: 12px;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 20px;
+  background: #f8f8f8;
+  color: #666;
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.type-btn:hover {
-  background: #ffe8e8;
-  border-color: #ff2442;
+  transition: all 0.3s;
 }
 
 .type-btn.active {
-  background: #fff;
+  background: #fff5f7;
   border-color: #ff2442;
-  box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.1);
-}
-
-.type-icon {
-  font-size: 32px;
-}
-
-.type-label {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
+  color: #ff2442;
 }
 
 .location-input {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 .location-btn {
-  padding: 12px 20px;
-  background: #f5f5f5;
-  border: none;
-  border-radius: 8px;
-  color: #666;
-  font-size: 14px;
-  cursor: pointer;
   white-space: nowrap;
-  transition: all 0.3s ease;
+  padding: 0 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
 }
 
 .location-btn:hover {
-  background: #e5e5e5;
-  color: #333;
-}
-
-@media (max-width: 768px) {
-  .publish-container {
-    padding: 70px 10px 10px;
-  }
-
-  .publish-header {
-    padding: 15px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .publish-submit-btn {
-    padding: 8px 20px;
-    font-size: 14px;
-  }
-
-  .publish-form {
-    padding: 20px;
-  }
-
-  .type-options {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 8px;
-  }
-
-  .type-btn {
-    padding: 12px;
-  }
-
-  .type-icon {
-    font-size: 24px;
-  }
-
-  .location-input {
-    flex-direction: column;
-  }
-
-  .location-btn {
-    width: 100%;
-  }
+  color: #ff2442;
+  border-color: #ff2442;
 }
 </style>

@@ -10,7 +10,7 @@
     </div>
 
     <div class="post-content">
-      <div class="post-title">{{ post.title }}</div>
+      <div class="post-title" v-html="post.title"></div>
       <div class="post-footer">
         <div class="post-author">
           <img

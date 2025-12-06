@@ -91,6 +91,8 @@ public class ProductServiceImpl implements ProductService {
     public Result<Void> postProduct(ProductDto productDto) {
         // 1.上传商品
         Product product = new Product();
+        BeanUtils.copyProperties(productDto, product);
+        productMapper.insert(product);
 
         // 2.上传商品属性
         ProductAttribute productAttribute = productDto.getProductAttribute();
@@ -104,5 +106,20 @@ public class ProductServiceImpl implements ProductService {
     public Result<Void> updateProduct(Product product) {
         productMapper.updateById(product);
         return Result.success(null);
+    }
+
+    @Override
+    public Result<List<Product>> searchProduct(String keyword, Double minPrice, Double maxPrice) {
+        LambdaQueryWrapper<Product> queryWrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isEmpty()) {
+            queryWrapper.like(Product::getName, keyword);
+        }
+        if (minPrice != null) {
+            queryWrapper.ge(Product::getPrice, minPrice);
+        }
+        if (maxPrice != null) {
+            queryWrapper.le(Product::getPrice, maxPrice);
+        }
+        return Result.success(productMapper.selectList(queryWrapper));
     }
 }

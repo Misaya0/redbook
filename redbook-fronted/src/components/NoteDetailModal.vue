@@ -181,6 +181,7 @@ import { getNote, likeNote, isLike, collectNote, isCollection } from '@/api/note
 import { getCommentList, postComment, likeComment, unlikeComment } from '@/api/comment'
 import { isAttention, toggleAttention } from '@/api/user'
 import { useUserStore } from '@/store/user'
+import { useModal } from '@/utils/modal'
 
 const props = defineProps({
   visible: Boolean,
@@ -188,6 +189,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible'])
+const { showAlert } = useModal()
 
 const note = ref({})
 const comments = ref([])
@@ -224,6 +226,10 @@ const checkFollowStatus = async (userId) => {
     }
   } catch (error) {
     console.error('获取关注状态失败', error)
+    if (!error.isHandled) {
+      // 关注状态获取失败通常不影响主要功能，可以选择不弹窗或者使用轻提示
+      console.warn('关注状态获取失败', error)
+    }
   }
 }
 
@@ -237,6 +243,9 @@ const checkLikeAndCollectionStatus = async (id) => {
     isCollected.value = !!collectRes
   } catch (error) {
     console.error('获取点赞收藏状态失败', error)
+    if (!error.isHandled) {
+      console.warn('获取点赞收藏状态失败', error)
+    }
   }
 }
 
@@ -249,6 +258,9 @@ const handleFollow = async () => {
     isFollowed.value = !isFollowed.value
   } catch (error) {
     console.error('操作失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '操作失败', '错误')
+    }
   }
 }
 
@@ -264,6 +276,9 @@ const handleLike = async () => {
     }
   } catch (error) {
     console.error('点赞失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '点赞失败', '错误')
+    }
   }
 }
 
@@ -279,6 +294,9 @@ const handleCollect = async () => {
     }
   } catch (error) {
     console.error('收藏失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '收藏失败', '错误')
+    }
   }
 }
 
@@ -306,6 +324,9 @@ const handleCommentLike = async (comment) => {
     }
   } catch (error) {
     console.error('操作失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '操作失败', '错误')
+    }
   }
 }
 
@@ -360,6 +381,9 @@ const handlePostComment = async () => {
     
   } catch (error) {
     console.error('评论失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '评论失败', '错误')
+    }
   }
 }
 
@@ -397,6 +421,9 @@ const loadData = async () => {
     
   } catch (error) {
     console.error('加载详情失败', error)
+    if (!error.isHandled) {
+      await showAlert(error.message || '加载详情失败', '错误')
+    }
   } finally {
     loading.value = false
     commentsLoading.value = false

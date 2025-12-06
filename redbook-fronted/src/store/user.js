@@ -38,7 +38,7 @@ export const useUserStore = defineStore('user', () => {
       }
     } catch (error) {
       console.error('用户状态管理 - 登录错误:', error)
-      return { success: false, message: error.message || '登录失败' }
+      return { success: false, message: error.message || '登录失败', isHandled: error.isHandled }
     }
   }
 
@@ -74,7 +74,7 @@ export const useUserStore = defineStore('user', () => {
       const response = await sendVerifyCodeAPI(phone)
       return { success: true, message: '验证码已发送' }
     } catch (error) {
-      return { success: false, message: error.message || '发送失败' }
+      return { success: false, message: error.message || '发送失败', isHandled: error.isHandled }
     }
   }
 
