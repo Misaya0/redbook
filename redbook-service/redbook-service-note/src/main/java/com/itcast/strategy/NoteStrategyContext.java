@@ -33,5 +33,10 @@ public class NoteStrategyContext {
      * 笔记类型
      */
     private String type;
+
+    /**
+     * 用户ID
+     */
+    private Long userId;
 }
 

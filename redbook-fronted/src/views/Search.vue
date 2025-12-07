@@ -46,11 +46,15 @@
             :post="note"
             @click="handleNoteClick"
           />
+          <NoteDetailModal
+            v-model:visible="showNoteDetail"
+            :note-id="currentNoteId"
+          />
         </div>
 
         <!-- User Results -->
         <div v-if="activeTab === 1" class="user-list">
-          <div v-for="user in results" :key="user.id" class="user-item">
+          <div v-for="user in results" :key="user.id" class="user-item" @click="navigateToUser(user.id)">
             <img :src="user.image || defaultAvatar" class="user-avatar" />
             <div class="user-info">
               <div class="user-name" v-html="highlight(user.nickname)"></div>
@@ -88,6 +92,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { searchApi } from '@/api/search'
 import PostCard from '@/components/PostCard.vue'
+import NoteDetailModal from '@/components/NoteDetailModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -98,6 +103,8 @@ const results = ref([])
 const page = ref(1)
 const size = ref(20)
 const defaultAvatar = 'https://via.placeholder.com/50'
+const showNoteDetail = ref(false)
+const currentNoteId = ref(null)
 
 const keyword = computed(() => route.query.keyword || '')
 
@@ -119,7 +126,8 @@ const formattedNotes = computed(() => {
     likes: note.like || 0,
     author: {
       name: note.user?.nickname || '未知用户',
-      avatar: note.user?.image || defaultAvatar
+      avatar: note.user?.image || defaultAvatar,
+      id: note.user?.id || note.userId
     }
   }))
 })
@@ -135,7 +143,7 @@ const fetchResults = async () => {
       page: page.value,
       size: size.value
     })
-    results.value = res || []
+    results.value = Array.isArray(res) ? res : []
   } catch (error) {
     console.error('Search failed:', error)
     results.value = []
@@ -155,15 +163,27 @@ const handlePageChange = (newPage) => {
 }
 
 const handleNoteClick = (note) => {
-  // TODO: Open note detail
-  console.log('Click note', note)
+  // 打开帖子详情弹窗
+  currentNoteId.value = note.id
+  showNoteDetail.value = true
+}
+
+const navigateToUser = (userId) => {
+  if (!userId) return
+  router.push(`/user/${userId}`)
 }
 
 const highlight = (text) => {
   if (!text) return ''
   if (!keyword.value) return text
-  const reg = new RegExp(keyword.value, 'gi')
-  return text.replace(reg, match => `<span style="color: red">${match}</span>`)
+  // 转义正则表达式特殊字符
+  const escapedKeyword = keyword.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  try {
+    const reg = new RegExp(escapedKeyword, 'gi')
+    return text.replace(reg, match => `<span style="color: red">${match}</span>`)
+  } catch (e) {
+    return text
+  }
 }
 
 onMounted(() => {
@@ -241,6 +261,7 @@ onMounted(() => {
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
     
     .user-avatar {
       width: 50px;

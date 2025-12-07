@@ -23,12 +23,8 @@ export const useUserStore = defineStore('user', () => {
         token.value = response
         localStorage.setItem('token', response)
 
-        // 保存用户信息
-        userInfo.value = {
-          phone: phone,
-          nickname: '用户' + phone.slice(-4),
-          image: `https://via.placeholder.com/64x64/${Math.floor(Math.random()*16777215).toString(16)}/ffffff?text=U`
-        }
+        // 获取完整用户信息
+        await getUserInfo()
 
         console.log('用户状态管理 - 登录成功，用户信息:', userInfo.value)
         return { success: true, message: '登录成功' }

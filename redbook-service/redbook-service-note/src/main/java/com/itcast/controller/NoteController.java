@@ -79,6 +79,34 @@ public class NoteController {
         return noteService.getNotes(NoteStrategyType.BY_COLLECTION, context);
     }
 
+    @Operation(summary = "获取指定用户发布的笔记", description = "获取指定用户发布的所有笔记")
+    @GetMapping("/getNoteListByUserId")
+    public Result<List<NoteVo>> getNoteListByUserId(
+            @Parameter(description = "用户ID", required = true) @RequestParam("userId") Long userId,
+            @Parameter(description = "页码", required = false) @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @Parameter(description = "每页数量", required = false) @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize) {
+        NoteStrategyContext context = NoteStrategyContext.builder()
+                .userId(userId)
+                .page(page)
+                .pageSize(pageSize)
+                .build();
+        return noteService.getNotes(NoteStrategyType.BY_USER_ID, context);
+    }
+
+    @Operation(summary = "获取指定用户收藏的笔记", description = "获取指定用户收藏的所有笔记")
+    @GetMapping("/getNoteListByCollectionUserId")
+    public Result<List<NoteVo>> getNoteListByCollectionUserId(
+            @Parameter(description = "用户ID", required = true) @RequestParam("userId") Long userId,
+            @Parameter(description = "页码", required = false) @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @Parameter(description = "每页数量", required = false) @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize) {
+        NoteStrategyContext context = NoteStrategyContext.builder()
+                .userId(userId)
+                .page(page)
+                .pageSize(pageSize)
+                .build();
+        return noteService.getNotes(NoteStrategyType.BY_COLLECTION_USER_ID, context);
+    }
+
     @Operation(summary = "获取点赞的笔记", description = "获取当前用户点赞过的所有笔记")
     @GetMapping("/getNoteByLike")
     public Result<List<NoteVo>> getNoteByLike() {

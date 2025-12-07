@@ -33,6 +33,40 @@ export const getNoteListByLocation = (longitude, latitude) => {
 }
 
 /**
+ * 获取指定用户发布的笔记
+ * @param {number} userId - 用户ID
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ * @returns {Promise}
+ */
+export const getNoteListByUserId = (userId, page, pageSize) => {
+  return request.get('/note/getNoteListByUserId', {
+    params: {
+      userId,
+      page,
+      pageSize
+    }
+  })
+}
+
+/**
+ * 获取指定用户收藏的笔记
+ * @param {number} userId - 用户ID
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ * @returns {Promise}
+ */
+export const getNoteListByCollectionUserId = (userId, page, pageSize) => {
+  return request.get('/note/getNoteListByCollectionUserId', {
+    params: {
+      userId,
+      page,
+      pageSize
+    }
+  })
+}
+
+/**
  * 获取自己发布的笔记列表
  * @returns {Promise}
  */

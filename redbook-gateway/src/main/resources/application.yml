@@ -13,37 +13,54 @@ spring:
         - id: redbook-service-user
           uri: lb://redbook-service-user
           predicates:
-            - Path=/user/**
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=1   # 把 /api 去掉，微服务实际收到的是 /user/...
+
         # 笔记服务路由
         - id: redbook-service-note
           uri: lb://redbook-service-note
           predicates:
-            - Path=/note/**
+            - Path=/api/note/**
+          filters:
+            - StripPrefix=1
+
         # 商品服务路由
         - id: redbook-service-product
           uri: lb://redbook-service-product
           predicates:
-            - Path=/product/**
+            - Path=/api/product/**
+          filters:
+            - StripPrefix=1
+
         # 订单服务路由
         - id: redbook-service-order
           uri: lb://redbook-service-order
           predicates:
-            - Path=/order/**
+            - Path=/api/order/**
+          filters:
+            - StripPrefix=1
+
         # 评论服务路由
         - id: redbook-service-comment
           uri: lb://redbook-service-comment
           predicates:
-            - Path=/comment/**
+            - Path=/api/comment/**
+          filters:
+            - StripPrefix=1
+
         # 搜索服务路由
         - id: redbook-service-search
           uri: lb://redbook-service-search
           predicates:
-            - Path=/search/**
-        # WebSocket服务路由（使用Nacos服务发现）
+            - Path=/api/search/**
+          filters:
+            - StripPrefix=1
+
+        # WebSocket 路由可以保持不变
         - id: redbook-netty-websocket
           uri: lb://redbook-netty-websocket
           predicates:
             - Path=/ws/**
           filters:
-            # WebSocket路径映射：网关 /ws/socket -> 后端 /socket
             - RewritePath=/ws/(?<segment>.*), /${segment}

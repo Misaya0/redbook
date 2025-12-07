@@ -27,8 +27,8 @@ spring:
   rabbitmq:
     host: 10.1.40.66  # 需要本地启动RabbitMQ
     port: 5672
-    username: guest
-    password: guest
+    username: admin
+    password: 123321
     virtual-host: /
 mybatis-plus:
   configuration:

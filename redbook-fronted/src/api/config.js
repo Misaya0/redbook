@@ -1,7 +1,7 @@
 // API配置
 export const API_CONFIG = {
-  // 使用Vite代理，所以基础URL为空，直接使用相对路径
-  BASE_URL: '',
+  // 使用Vite代理，基础URL添加/api前缀
+  BASE_URL: '/api',
 
   // API端点
   endpoints: {

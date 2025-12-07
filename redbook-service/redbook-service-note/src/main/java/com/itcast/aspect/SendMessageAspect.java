@@ -45,31 +45,30 @@ public class SendMessageAspect {
 
         BehaviorMessage behaviorMessage = null;
 
-        switch (type) {
-            case SCAN:
-                behaviorMessage = BehaviorMessage.builder()
-                        .userId(userId)
-                        .noteId(noteId)
-                        .viewTime(new Date())
-                        .leaveTime(new Date())
-                        .logType(LogType.SCAN)
-                        .build();
-                break;
-            case LIKE:
-                behaviorMessage = BehaviorMessage.builder()
-                        .userId(userId)
-                        .noteId(noteId)
-                        .likeTime(new Date())
-                        .logType(LogType.LIKE)
-                        .build();
-                break;
+        if (type == LogType.SCAN) {
+            behaviorMessage = BehaviorMessage.builder()
+                    .userId(userId)
+                    .noteId(noteId)
+                    .viewTime(new Date())
+                    .leaveTime(new Date())
+                    .logType(LogType.SCAN)
+                    .build();
+        } else if (type == LogType.LIKE) {
+            behaviorMessage = BehaviorMessage.builder()
+                    .userId(userId)
+                    .noteId(noteId)
+                    .likeTime(new Date())
+                    .logType(LogType.LIKE)
+                    .build();
         }
 
-        try {
-            log.info("【用户行为日志】用户[id={}]对笔记[id={}]执行了{}操作", userId, noteId, type);
-            kafkaTemplate.send("user-behavior-log", objectMapper.writeValueAsString(behaviorMessage));
-        } catch (JsonProcessingException e) {
-            log.error("序列化用户行为日志失败 noteId:{} userId:{}", noteId, userId, e);
+        if (behaviorMessage != null) {
+            try {
+                log.info("【用户行为日志】用户[id={}]对笔记[id={}]执行了{}操作", userId, noteId, type);
+                kafkaTemplate.send("user-behavior-log", objectMapper.writeValueAsString(behaviorMessage));
+            } catch (JsonProcessingException e) {
+                log.error("序列化用户行为日志失败 noteId:{} userId:{}", noteId, userId, e);
+            }
         }
     }
 }

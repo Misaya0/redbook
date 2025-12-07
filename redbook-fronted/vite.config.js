@@ -13,37 +13,7 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
-      // 统一代理到网关
-      '/user': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/note': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/comment': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/search': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/product': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/order': {
-        target: 'http://localhost:10010',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
+      // 统一代理到网关，后端路由已添加 /api 前缀
       '/api': {
         target: 'http://localhost:10010',
         changeOrigin: true,

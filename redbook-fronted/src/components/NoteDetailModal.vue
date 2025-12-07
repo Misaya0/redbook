@@ -21,8 +21,8 @@
             <!-- 顶部用户信息 -->
             <div class="header-section">
               <div class="user-info">
-                <img :src="note.user?.image || defaultAvatar" class="avatar" alt="头像" />
-                <span class="username">{{ note.user?.nickname || '用户' + note.user?.id }}</span>
+                <img :src="note.user?.image || defaultAvatar" class="avatar" alt="头像" @click="navigateToUser(note.user?.id)" />
+                <span class="username" @click="navigateToUser(note.user?.id)">{{ note.user?.nickname || '用户' + note.user?.id }}</span>
                 <button 
                   v-if="!isSelf"
                   class="follow-btn" 
@@ -63,9 +63,9 @@
                 <div v-else class="comment-list">
                   <div v-for="comment in comments" :key="comment.id" class="comment-item-container">
                     <div class="comment-item">
-                      <img :src="comment.user?.image || defaultAvatar" class="comment-avatar" />
+                      <img :src="comment.user?.image || defaultAvatar" class="comment-avatar" @click="navigateToUser(comment.user?.id)" />
                       <div class="comment-content-wrapper">
-                        <div class="comment-user">{{ comment.user?.nickname || '用户' }}</div>
+                        <div class="comment-user" @click="navigateToUser(comment.user?.id)">{{ comment.user?.nickname || '用户' }}</div>
                         <div class="comment-text">{{ comment.content }}</div>
                         <div class="comment-footer">
                           <div class="comment-meta">{{ comment.dealTime || comment.time }}</div>
@@ -88,10 +88,10 @@
                     <!-- 子评论列表 -->
                     <div v-if="comment.childrenList && comment.childrenList.length" class="sub-comments">
                       <div v-for="child in comment.childrenList.slice(0, comment.shownCount || 1)" :key="child.id" class="comment-item sub-comment-item">
-                        <img :src="child.user?.image || defaultAvatar" class="comment-avatar small" />
+                        <img :src="child.user?.image || defaultAvatar" class="comment-avatar small" @click="navigateToUser(child.user?.id)" />
                         <div class="comment-content-wrapper">
                           <div class="comment-user">
-                            {{ child.user?.nickname || '用户' }}
+                            <span @click="navigateToUser(child.user?.id)">{{ child.user?.nickname || '用户' }}</span>
                             <span v-if="child.replyToUser" class="reply-target">
                               回复 <span class="target-name">{{ child.replyToUser }}</span>
                             </span>
@@ -177,6 +177,7 @@
 
 <script setup>
 import { ref, watch, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { getNote, likeNote, isLike, collectNote, isCollection } from '@/api/note'
 import { getCommentList, postComment, likeComment, unlikeComment } from '@/api/comment'
 import { isAttention, toggleAttention } from '@/api/user'
@@ -189,7 +190,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible'])
+const router = useRouter()
 const { showAlert } = useModal()
+
+const navigateToUser = (userId) => {
+  if (!userId) return
+  // 关闭当前弹窗
+  emit('update:visible', false)
+  router.push(`/user/${userId}`)
+}
 
 const note = ref({})
 const comments = ref([])

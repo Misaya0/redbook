@@ -12,7 +12,7 @@
     <div class="post-content">
       <div class="post-title" v-html="post.title"></div>
       <div class="post-footer">
-        <div class="post-author">
+        <div class="post-author" @click.stop="navigateToUser(post.author.id)">
           <img
             :src="post.author.avatar"
             :alt="post.author.name"
@@ -30,6 +30,8 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+
 const props = defineProps({
   post: {
     type: Object,
@@ -38,9 +40,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['click'])
+const router = useRouter()
 
 const handleClick = () => {
   emit('click', props.post)
+}
+
+const navigateToUser = (userId) => {
+  if (!userId) return
+  router.push(`/user/${userId}`)
 }
 
 const handleImageError = (event) => {
@@ -48,6 +56,7 @@ const handleImageError = (event) => {
 }
 
 const formatNumber = (num) => {
+  if (num === undefined || num === null) return '0'
   if (num >= 10000) {
     return (num / 10000).toFixed(1) + 'w'
   } else if (num >= 1000) {

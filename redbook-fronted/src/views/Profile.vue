@@ -394,8 +394,9 @@ const closeDialog = () => {
 
 const handleUserClick = (userId) => {
   console.log('点击用户:', userId)
-  // TODO: 跳转到用户详情页，后续需实现 /user/:id 路由
-  // router.push(`/user/${userId}`)
+  if (userId) {
+    router.push(`/user/${userId}`)
+  }
   closeDialog()
 }
 

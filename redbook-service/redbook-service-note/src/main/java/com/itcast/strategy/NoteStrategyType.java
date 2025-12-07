@@ -31,6 +31,14 @@ public enum NoteStrategyType {
     /**
      * 根据点赞查询
      */
-    BY_LIKE
+    BY_LIKE,
+    /**
+     * 根据用户ID查询发布的笔记
+     */
+    BY_USER_ID,
+    /**
+     * 根据用户ID查询收藏的笔记
+     */
+    BY_COLLECTION_USER_ID
 }
 

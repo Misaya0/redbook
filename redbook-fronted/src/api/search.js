@@ -4,7 +4,7 @@ export const searchApi = {
   // 综合搜索
   searchAll: (params) => {
     return request({
-      url: '/search/search/all',
+      url: '/search/all',
       method: 'get',
       params
     })
@@ -13,7 +13,7 @@ export const searchApi = {
   // 搜索建议
   getSuggestions: (keyword) => {
     return request({
-      url: '/search/search/suggest',
+      url: '/search/suggest',
       method: 'get',
       params: { keyword }
     })
