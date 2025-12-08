@@ -106,15 +106,9 @@ public class UserServiceImpl implements UserService {
         file.transferTo(new File(uploadDir + fileName));
         
         // 4.返回访问URL (需要网关配合转发或直接访问服务)
-        // 假设网关地址是 localhost:10010，服务路径是 /user/uploads/
-        // 但为了通用性，我们返回相对路径或者通过配置获取域名
-        // 这里简单起见，返回 /user/uploads/filename 供前端使用 (相对路径，前端会自动拼接 API host)
-        // 或者返回绝对路径 http://localhost:10010/user/uploads/filename
-        // 由于前端 request.js 配置了 baseURL，我们如果返回完整 http url 也可以
-        
-        // 注意：前端展示时，如果是完整URL则直接展示，否则可能会拼接
-        // 这里我们返回网关地址
-        return "http://localhost:10010/user/uploads/" + fileName;
+        // 返回相对路径，让前端自行拼接或直接使用网关路径
+        // 这里返回 /user/uploads/filename
+        return "/user/uploads/" + fileName;
     }
 
     @Override

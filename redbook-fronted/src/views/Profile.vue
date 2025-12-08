@@ -15,7 +15,7 @@
       <div class="user-card">
         <div class="user-header">
           <div class="avatar-section">
-            <img :src="userInfo.image || defaultAvatar" alt="用户头像" class="user-avatar" />
+            <img :src="getImageUrl(userInfo.image, defaultAvatar)" alt="用户头像" class="user-avatar" />
             <button class="edit-avatar-btn" @click="handleEditAvatar">
               <span>📷</span>
             </button>
@@ -220,7 +220,7 @@
           <div v-else-if="!dialogList || dialogList.length === 0" class="empty-text">暂无数据</div>
           <div v-else class="user-list">
             <div v-for="user in dialogList" :key="user.userId" class="user-item" @click="handleUserClick(user.userId)">
-              <img :src="user.image || defaultAvatar" class="user-item-avatar" />
+              <img :src="getImageUrl(user.image, defaultAvatar)" class="user-item-avatar" />
               <span class="user-item-name">{{ user.nickname || '用户' + user.userId }}</span>
             </div>
           </div>
@@ -318,6 +318,7 @@ import { useUserStore } from '@/store/user'
 import { getUserInfo, getAttentionList, getFansList, updateUserImage, editUserInfo } from '@/api/user'
 import { getNoteListByOwn, getNoteByLike, getNoteByCollection, deleteNote } from '@/api/note'
 import { useModal } from '@/utils/modal'
+import { getImageUrl } from '@/utils/image'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 
@@ -614,14 +615,14 @@ const transformNoteData = (noteVo) => {
   return {
     id: noteVo.id,
     title: noteVo.title || '无标题',
-    image: noteVo.image || 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书',
+    image: getImageUrl(noteVo.image, 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书'),
     likes: noteVo.like || 0,
     comments: noteVo.comment || 0,
     collects: noteVo.collection || 0,
     author: {
       id: noteVo.user?.id,
       name: noteVo.user?.nickname || '匿名用户',
-      avatar: noteVo.user?.image || 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U'
+      avatar: getImageUrl(noteVo.user?.image, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')
     },
     content: noteVo.content,
     time: noteVo.dealTime || noteVo.time

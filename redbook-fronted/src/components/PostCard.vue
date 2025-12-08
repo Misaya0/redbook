@@ -1,8 +1,9 @@
 <template>
   <div class="post-card" @click="handleClick">
+<!--    <p>{{ post.image }}</p>-->
     <div class="post-image-container">
       <img
-        :src="post.image"
+        :src="getImageUrl(post.image, 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书')"
         :alt="post.title"
         class="post-image"
         @error="handleImageError"
@@ -14,7 +15,7 @@
       <div class="post-footer">
         <div class="post-author" @click.stop="navigateToUser(post.author.id)">
           <img
-            :src="post.author.avatar"
+            :src="getImageUrl(post.author.avatar, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')"
             :alt="post.author.name"
             class="author-avatar"
           />
@@ -31,6 +32,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { getImageUrl } from '@/utils/image'
 
 const props = defineProps({
   post: {

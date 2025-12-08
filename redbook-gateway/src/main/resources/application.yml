@@ -57,6 +57,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # 消息服务路由
+        - id: redbook-service-message
+          uri: lb://redbook-service-message
+          predicates:
+            - Path=/api/message/**
+          filters:
+            - StripPrefix=1
+        
         # WebSocket 路由可以保持不变
         - id: redbook-netty-websocket
           uri: lb://redbook-netty-websocket

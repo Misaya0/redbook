@@ -46,6 +46,7 @@ import { useUserStore } from '@/store/user'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 import { getNoteListByAttention } from '@/api/note'
+import { getImageUrl } from '@/utils/image'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -63,14 +64,14 @@ const transformNoteData = (noteVo) => {
   return {
     id: noteVo.id,
     title: noteVo.title || '无标题',
-    image: noteVo.image || 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书',
+    image: getImageUrl(noteVo.image, 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书'),
     likes: noteVo.like || 0,
     comments: noteVo.comment || 0,
     collects: noteVo.collection || 0,
     author: {
       id: noteVo.user?.id,
       name: noteVo.user?.nickname || '匿名用户',
-      avatar: noteVo.user?.image || 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U'
+      avatar: getImageUrl(noteVo.user?.image, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')
     },
     content: noteVo.content,
     time: noteVo.dealTime || noteVo.time,

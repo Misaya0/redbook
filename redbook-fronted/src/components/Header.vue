@@ -112,6 +112,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useModal } from '@/utils/modal'
 import { searchApi } from '@/api/search'
+import { getImageUrl } from '@/utils/image'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -123,7 +124,7 @@ const showSuggestions = ref(false)
 
 // 获取用户头像
 const userAvatar = computed(() => {
-  return userStore.userInfo?.image || 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U'
+  return getImageUrl(userStore.userInfo?.image, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')
 })
 
 const goToLogin = () => {

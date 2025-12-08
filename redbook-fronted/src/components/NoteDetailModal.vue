@@ -10,7 +10,7 @@
             </div>
             <img 
               v-else
-              :src="note.image || defaultImage" 
+              :src="getImageUrl(note.image, defaultImage)" 
               class="note-image" 
               alt="笔记图片"
             />
@@ -21,7 +21,7 @@
             <!-- 顶部用户信息 -->
             <div class="header-section">
               <div class="user-info">
-                <img :src="note.user?.image || defaultAvatar" class="avatar" alt="头像" @click="navigateToUser(note.user?.id)" />
+                <img :src="getImageUrl(note.user?.image, defaultAvatar)" class="avatar" alt="头像" @click="navigateToUser(note.user?.id)" />
                 <span class="username" @click="navigateToUser(note.user?.id)">{{ note.user?.nickname || '用户' + note.user?.id }}</span>
                 <button 
                   v-if="!isSelf"
@@ -63,7 +63,7 @@
                 <div v-else class="comment-list">
                   <div v-for="comment in comments" :key="comment.id" class="comment-item-container">
                     <div class="comment-item">
-                      <img :src="comment.user?.image || defaultAvatar" class="comment-avatar" @click="navigateToUser(comment.user?.id)" />
+                      <img :src="getImageUrl(comment.user?.image, defaultAvatar)" class="comment-avatar" @click="navigateToUser(comment.user?.id)" />
                       <div class="comment-content-wrapper">
                         <div class="comment-user" @click="navigateToUser(comment.user?.id)">{{ comment.user?.nickname || '用户' }}</div>
                         <div class="comment-text">{{ comment.content }}</div>
@@ -88,7 +88,7 @@
                     <!-- 子评论列表 -->
                     <div v-if="comment.childrenList && comment.childrenList.length" class="sub-comments">
                       <div v-for="child in comment.childrenList.slice(0, comment.shownCount || 1)" :key="child.id" class="comment-item sub-comment-item">
-                        <img :src="child.user?.image || defaultAvatar" class="comment-avatar small" @click="navigateToUser(child.user?.id)" />
+                        <img :src="getImageUrl(child.user?.image, defaultAvatar)" class="comment-avatar small" @click="navigateToUser(child.user?.id)" />
                         <div class="comment-content-wrapper">
                           <div class="comment-user">
                             <span @click="navigateToUser(child.user?.id)">{{ child.user?.nickname || '用户' }}</span>
@@ -183,6 +183,7 @@ import { getCommentList, postComment, likeComment, unlikeComment } from '@/api/c
 import { isAttention, toggleAttention } from '@/api/user'
 import { useUserStore } from '@/store/user'
 import { useModal } from '@/utils/modal'
+import { getImageUrl } from '@/utils/image'
 
 const props = defineProps({
   visible: Boolean,

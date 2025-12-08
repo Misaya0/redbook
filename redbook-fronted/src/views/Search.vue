@@ -55,7 +55,7 @@
         <!-- User Results -->
         <div v-if="activeTab === 1" class="user-list">
           <div v-for="user in results" :key="user.id" class="user-item" @click="navigateToUser(user.id)">
-            <img :src="user.image || defaultAvatar" class="user-avatar" />
+            <img :src="getImageUrl(user.image, defaultAvatar)" class="user-avatar" />
             <div class="user-info">
               <div class="user-name" v-html="highlight(user.nickname)"></div>
               <div class="user-id">ID: {{ user.number }}</div>
@@ -67,7 +67,7 @@
         <!-- Product Results -->
         <div v-if="activeTab === 2" class="product-grid">
           <div v-for="product in results" :key="product.id" class="product-item">
-            <img :src="product.image" class="product-image" />
+            <img :src="getImageUrl(product.image)" class="product-image" />
             <div class="product-info">
               <div class="product-name" v-html="highlight(product.name)"></div>
               <div class="product-price">¥{{ product.price }}</div>
@@ -93,6 +93,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { searchApi } from '@/api/search'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
+import { getImageUrl } from '@/utils/image'
 
 const route = useRoute()
 const router = useRouter()

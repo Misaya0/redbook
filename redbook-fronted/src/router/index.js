@@ -7,6 +7,8 @@ import Profile from '@/views/Profile.vue'
 import Publish from '@/views/Publish.vue'
 import Search from '@/views/Search.vue'
 import UserProfile from '@/views/UserProfile.vue'
+import MessageList from '@/views/Message/MessageList.vue'
+import ChatRoom from '@/views/Message/ChatRoom.vue'
 
 const routes = [
   {
@@ -18,6 +20,18 @@ const routes = [
     path: '/explore',
     name: 'Explore',
     component: Explore
+  },
+  {
+    path: '/message',
+    name: 'Message',
+    component: MessageList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/message/chat/:id',
+    name: 'ChatRoom',
+    component: ChatRoom,
+    meta: { requiresAuth: true }
   },
   {
     path: '/user/:id',

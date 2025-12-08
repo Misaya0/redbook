@@ -103,8 +103,8 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 # 本地文件存储配置（用于开发测试）
 local-file:
-  upload-path: E:/JavaSE/project/RedBook-master/uploads
-  access-url: http://localhost:8085/uploads
+  upload-path: ${user.dir}/uploads
+  access-url: /note/uploads
 glm:
   api_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
   api_key: 114f0117fa8a493b845da224e024f148.UGHBeLZymMO8I5zn

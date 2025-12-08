@@ -120,6 +120,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { postNote, updateNote, getNote } from '@/api/note'
 import { useModal } from '@/utils/modal'
+import { getImageUrl } from '@/utils/image'
 
 const router = useRouter()
 const route = useRoute()
@@ -158,7 +159,7 @@ onMounted(async () => {
         formData.value.latitude = note.latitude ? String(note.latitude) : ''
         
         if (note.image) {
-          imagePreview.value = note.image
+          imagePreview.value = getImageUrl(note.image)
         }
       }
     } catch (e) {
