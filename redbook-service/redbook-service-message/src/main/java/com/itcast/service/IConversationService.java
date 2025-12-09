@@ -10,4 +10,6 @@ public interface IConversationService extends IService<Conversation> {
     List<ConversationVo> getConversationList(Long userId);
 
     void updateLastMessage(Long userId, Long talkerId, String content);
+
+    void clearUnreadCount(Long userId, Long talkerId);
 }

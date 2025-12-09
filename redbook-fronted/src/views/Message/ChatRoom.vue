@@ -4,19 +4,27 @@
       <button class="back-btn" @click="router.back()">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
-      <h3>用户 {{ talkerId }}</h3>
+      <h3>{{ talkerName || '用户 ' + talkerId }}</h3>
       <div class="placeholder"></div>
     </div>
 
     <div class="message-container" ref="messageContainer">
       <div v-if="loading" class="loading">加载历史消息...</div>
+      <div v-if="error" class="error-msg">{{ error }}</div>
       
       <div v-for="(msg, index) in messages" :key="index" 
            class="message-item" 
            :class="{ 'self': isSelf(msg) }">
-        <div class="avatar">
-           {{ isSelf(msg) ? '我' : 'Ta' }}
-        </div>
+        <img 
+          v-if="isSelf(msg)"
+          :src="getImageUrl(userStore.userInfo?.image, defaultAvatar)"
+          class="avatar-img"
+        />
+        <img 
+          v-else
+          :src="getImageUrl(talkerAvatar, defaultAvatar)"
+          class="avatar-img"
+        />
         <div class="message-content">
           <div class="bubble">
             {{ msg.content }}
@@ -41,9 +49,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getHistory, sendMessage } from '@/api/chat'
+import { getHistory, sendMessage, markAsRead } from '@/api/chat'
+import { getUserById } from '@/api/user'
 import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'
+import { getImageUrl } from '@/utils/image'
+import { formatTime } from '@/utils/date'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,9 +62,14 @@ const chatStore = useChatStore()
 const userStore = useUserStore()
 
 const talkerId = route.params.id
+const talkerName = ref('')
+const talkerAvatar = ref('')
 const inputContent = ref('')
 const messageContainer = ref(null)
 const loading = ref(true)
+const error = ref(null)
+const defaultAvatar = 'https://via.placeholder.com/40'
+let pollingTimer = null
 
 // 使用 store 中的 messages
 const messages = computed(() => chatStore.messages)
@@ -72,17 +88,51 @@ const scrollToBottom = () => {
 }
 
 // 监听消息变化，自动滚动到底部
-watch(messages, () => {
+watch(messages, (newMsgs) => {
   scrollToBottom()
+  // 如果收到新消息，且最后一条消息不是自己发的，标记为已读
+  if (newMsgs.length > 0) {
+    const lastMsg = newMsgs[newMsgs.length - 1]
+    if (!isSelf(lastMsg)) {
+      handleMarkAsRead()
+    }
+  }
 }, { deep: true })
+
+const handleMarkAsRead = async (retryCount = 0) => {
+  try {
+    await markAsRead(talkerId)
+  } catch (err) {
+    console.error('标记已读失败', err)
+    if (retryCount < 3) {
+      setTimeout(() => {
+        handleMarkAsRead(retryCount + 1)
+      }, 1000 * (retryCount + 1))
+    }
+  }
+}
+
+const fetchTalkerInfo = async () => {
+  try {
+    const res = await getUserById(talkerId)
+    if (res) {
+      talkerName.value = res.nickname
+      talkerAvatar.value = res.image
+    }
+  } catch (err) {
+    console.error('获取用户信息失败', err)
+    error.value = '无法获取用户信息'
+  }
+}
 
 const fetchHistory = async () => {
   try {
     const res = await getHistory(talkerId)
     chatStore.setMessages(res || [])
     scrollToBottom()
-  } catch (error) {
-    console.error('获取历史消息失败', error)
+  } catch (err) {
+    console.error('获取历史消息失败', err)
+    error.value = '获取消息失败'
   } finally {
     loading.value = false
   }
@@ -113,12 +163,6 @@ const handleSend = async () => {
   }
 }
 
-const formatTime = (timeStr) => {
-  if (!timeStr) return ''
-  const date = new Date(timeStr)
-  return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0')
-}
-
 onMounted(() => {
   // 设置当前聊天对象
   chatStore.setCurrentTalker(talkerId)
@@ -128,12 +172,24 @@ onMounted(() => {
     chatStore.connect()
   }
   
+  fetchTalkerInfo()
   fetchHistory()
+  // 进入页面时，标记已读
+  handleMarkAsRead()
+
+  // 启动轮询（作为 WebSocket 不可用时的降级方案）
+  pollingTimer = setInterval(() => {
+    if (!chatStore.isConnected) {
+      console.log('WebSocket disconnected, polling history...')
+      fetchHistory()
+    }
+  }, 5000)
 })
 
 onUnmounted(() => {
+  if (pollingTimer) clearInterval(pollingTimer)
   chatStore.setCurrentTalker(null)
-  chatStore.setMessages([]) // 离开时清空当前聊天记录，或者保留看需求
+  // chatStore.clearMessages() // 保留缓存，不清除消息
 })
 </script>
 
@@ -178,6 +234,12 @@ onUnmounted(() => {
   gap: 15px;
 }
 
+.loading, .error-msg {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+}
+
 .message-item {
   display: flex;
   align-items: flex-start;
@@ -190,21 +252,12 @@ onUnmounted(() => {
   flex-direction: row-reverse;
 }
 
-.avatar {
+.avatar-img {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: white;
-  flex-shrink: 0;
-}
-
-.self .avatar {
-  background: #ff2442;
+  object-fit: cover;
+  border: 1px solid #eee;
 }
 
 .message-content {
@@ -213,34 +266,34 @@ onUnmounted(() => {
   gap: 4px;
 }
 
-.self .message-content {
-  align-items: flex-end;
-}
-
 .bubble {
   padding: 10px 14px;
-  background: white;
   border-radius: 12px;
+  background: white;
+  color: #333;
   font-size: 15px;
-  line-height: 1.4;
-  word-break: break-word;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .self .bubble {
   background: #ff2442;
   color: white;
-  border-radius: 12px 12px 0 12px;
+  border-radius: 12px 0 12px 12px;
 }
 
 .message-item:not(.self) .bubble {
-  border-radius: 12px 12px 12px 0;
+  border-radius: 0 12px 12px 12px;
 }
 
 .time {
-  font-size: 10px;
+  font-size: 12px;
   color: #999;
-  margin: 0 2px;
+  padding: 0 4px;
+}
+
+.self .time {
+  text-align: right;
 }
 
 .input-area {
@@ -249,41 +302,37 @@ onUnmounted(() => {
   border-top: 1px solid #e5e5e5;
   display: flex;
   gap: 10px;
-  align-items: center;
   flex-shrink: 0;
 }
 
 .input-area input {
   flex: 1;
   padding: 10px 15px;
-  border: 1px solid #ddd;
   border-radius: 20px;
+  border: 1px solid #ddd;
+  background: #f8f8f8;
   outline: none;
   font-size: 14px;
 }
 
 .input-area input:focus {
+  background: white;
   border-color: #ff2442;
 }
 
 .input-area button {
-  padding: 8px 20px;
+  padding: 0 20px;
+  border-radius: 20px;
   background: #ff2442;
   color: white;
   border: none;
-  border-radius: 20px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
+  transition: opacity 0.2s;
 }
 
 .input-area button:disabled {
-  background: #fcc;
+  opacity: 0.5;
   cursor: not-allowed;
-}
-
-.loading {
-  text-align: center;
-  color: #999;
-  margin-top: 20px;
 }
 </style>

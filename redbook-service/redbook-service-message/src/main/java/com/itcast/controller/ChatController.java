@@ -43,6 +43,16 @@ public class ChatController {
         return Result.success(chatMessageService.getHistory(userId, talkerId));
     }
 
+    @Operation(summary = "标记会话已读", description = "将与指定用户的会话未读数清零")
+    @PostMapping("/conversation/read")
+    public Result<Void> markAsRead(
+            @Parameter(description = "聊天对象ID", required = true) @RequestParam Long talkerId) {
+        Integer userIdInt = UserContext.getUserId();
+        Long userId = userIdInt != null ? userIdInt.longValue() : null;
+        conversationService.clearUnreadCount(userId, talkerId);
+        return Result.success(null);
+    }
+
     @Operation(summary = "发送消息", description = "向指定用户发送消息")
     @PostMapping("/send")
     public Result<ChatMessage> sendMessage(

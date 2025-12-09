@@ -152,6 +152,7 @@
 <script setup>
 import {ref, computed, onMounted, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
+import {useUserStore} from '@/store/user'
 import {getUserById, isAttention, toggleAttention, getAttentionList, getFansList} from '@/api/user'
 import {getNoteListByUserId, getNoteListByCollectionUserId} from '@/api/note'
 import PostCard from '@/components/PostCard.vue'
@@ -162,6 +163,7 @@ import {useModal} from '@/utils/modal'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const { showConfirm } = useModal()
 const userId = computed(() => route.params.id)
 const defaultAvatar = 'https://via.placeholder.com/100'
@@ -328,7 +330,8 @@ const handleChat = () => {
   if (String(userId.value) === String(userStore.userInfo?.id)) {
       return
   }
-  router.push(`/message/chat/${userId.value}`)
+  // 使用 encodeURIComponent 确保参数安全
+  router.push(`/message/chat/${encodeURIComponent(userId.value)}`)
 }
 
 // 列表加载

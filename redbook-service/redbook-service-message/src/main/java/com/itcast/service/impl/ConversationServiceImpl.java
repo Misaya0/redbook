@@ -83,4 +83,16 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         conversation.setUpdateTime(LocalDateTime.now());
         saveOrUpdate(conversation);
     }
+
+    @Override
+    public void clearUnreadCount(Long userId, Long talkerId) {
+        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>()
+                .eq(Conversation::getUserId, userId)
+                .eq(Conversation::getTalkerId, talkerId));
+
+        if (conversation != null && conversation.getUnreadCount() > 0) {
+            conversation.setUnreadCount(0);
+            updateById(conversation);
+        }
+    }
 }

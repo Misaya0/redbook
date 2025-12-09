@@ -13,6 +13,7 @@
         v-for="item in conversations" 
         :key="item.id" 
         class="conversation-item"
+        :class="{ 'flashing': item.flashing }"
         @click="goToChat(item.talkerId)"
       >
         <div class="avatar-wrapper">
@@ -43,11 +44,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getConversationList } from '@/api/chat'
 import { useChatStore } from '@/store/chat'
 import { getImageUrl } from '@/utils/image'
+import { formatTimeForList as formatTime } from '@/utils/date'
 
 const router = useRouter()
 const chatStore = useChatStore()
@@ -65,22 +67,39 @@ const fetchConversations = async () => {
   }
 }
 
+// 监听新消息
+watch(() => chatStore.lastReceivedMessage, (newMsg) => {
+  if (!newMsg) return
+  
+  // 查找对应的会话
+  const index = conversations.value.findIndex(c => String(c.talkerId) === String(newMsg.senderId))
+  
+  if (index !== -1) {
+    // 更新现有会话
+    const conversation = conversations.value[index]
+    conversation.lastMessageContent = newMsg.content
+    conversation.lastMessageTime = newMsg.createTime
+    conversation.unreadCount = (conversation.unreadCount || 0) + 1
+    
+    // 添加闪烁效果标记
+    if (conversation.flashTimer) clearTimeout(conversation.flashTimer)
+    conversation.flashing = true
+    conversation.flashTimer = setTimeout(() => {
+      conversation.flashing = false
+      conversation.flashTimer = null
+    }, 2000)
+
+    // 移动到顶部
+    conversations.value.splice(index, 1)
+    conversations.value.unshift(conversation)
+  } else {
+    // 新会话，重新获取列表
+    fetchConversations()
+  }
+})
+
 const goToChat = (userId) => {
   router.push(`/message/chat/${userId}`)
-}
-
-const formatTime = (timeStr) => {
-  if (!timeStr) return ''
-  const date = new Date(timeStr)
-  const now = new Date()
-  
-  if (date.toDateString() === now.toDateString()) {
-    // 今天，显示 HH:mm
-    return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0')
-  } else {
-    // 非今天，显示 MM-dd
-    return (date.getMonth() + 1).toString().padStart(2, '0') + '-' + date.getDate().toString().padStart(2, '0')
-  }
 }
 
 onMounted(() => {
@@ -200,5 +219,15 @@ onMounted(() => {
   text-align: center;
   padding: 40px;
   color: #999;
+}
+
+@keyframes flash {
+  0% { background-color: #fff; }
+  50% { background-color: #e6f7ff; }
+  100% { background-color: #fff; }
+}
+
+.flashing {
+  animation: flash 1s ease-in-out infinite;
 }
 </style>

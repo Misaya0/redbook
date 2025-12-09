@@ -31,3 +31,14 @@ export const sendMessage = (data) => {
     params: data
   })
 }
+
+// 标记会话已读
+export const markAsRead = (talkerId) => {
+  return request({
+    url: '/message/chat/conversation/read',
+    method: 'post',
+    params: {
+      talkerId
+    }
+  })
+}
