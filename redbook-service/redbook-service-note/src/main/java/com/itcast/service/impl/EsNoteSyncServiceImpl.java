@@ -1,5 +1,11 @@
 package com.itcast.service.impl;
 
+import com.itcast.constant.MqConstant;
+import com.itcast.mapper.NoteMapper;
+import com.itcast.model.dto.NoteDto;
+import com.itcast.model.dto.NoteEsSyncMessage;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.BeanUtils;
 import com.google.gson.Gson;
 import com.itcast.mapper.NoteSyncMapper;
 import com.itcast.model.pojo.Note;
@@ -30,6 +36,12 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
     @Autowired
     private NoteSyncMapper noteSyncMapper;
 
+    @Autowired
+    private NoteMapper noteMapper;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
     private final Gson gson = new Gson();
 
     @Override
@@ -47,6 +59,18 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
 
         // 3. 写入 ES
         syncNotesToEs(notes);
+    }
+
+    @Override
+    public void syncNote(Long noteId) {
+        Note note = noteMapper.selectById(noteId);
+        if (note != null) {
+            NoteEsSyncMessage message = new NoteEsSyncMessage("UPDATE", note.getId(), note);
+            rabbitTemplate.convertAndSend(MqConstant.NOTE_ES_EXCHANGE, MqConstant.NOTE_ES_SYNC_KEY, message);
+            log.info("Manual sync triggered for note: {}", noteId);
+        } else {
+            log.warn("Manual sync failed: Note not found for id {}", noteId);
+        }
     }
 
     @Override

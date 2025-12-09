@@ -44,6 +44,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.itcast.util.LocalFileUtil;
+import com.itcast.constant.MqConstant;
+import com.itcast.model.dto.NoteEsSyncMessage;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.itcast.model.pojo.NoteEs;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,6 +78,9 @@ public class NoteServiceImpl implements NoteService {
     
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     private static final Lock lock = new ReentrantLock();
 
@@ -270,14 +276,13 @@ public class NoteServiceImpl implements NoteService {
             noteCache.evict(note.getId());
         }
 
-        // 7. 更新 ES
+        // 7. 更新 ES (通过MQ异步同步)
         try {
-            NoteEs noteEs = new NoteEs();
-            BeanUtils.copyProperties(note, noteEs);
-            noteEs.setId(Math.toIntExact(note.getId()));
-            elasticsearchOperations.save(noteEs);
+            NoteEsSyncMessage message = new NoteEsSyncMessage("UPDATE", note.getId(), note);
+            rabbitTemplate.convertAndSend(MqConstant.NOTE_ES_EXCHANGE, MqConstant.NOTE_ES_SYNC_KEY, message);
+            log.info("Sent ES sync message (UPDATE) for note: {}", note.getId());
         } catch (Exception e) {
-            log.error("ES更新失败", e);
+            log.error("ES同步消息发送失败", e);
         }
 
         return Result.success(null);
@@ -308,11 +313,13 @@ public class NoteServiceImpl implements NoteService {
             noteCache.evict(noteId);
         }
 
-        // 5. 删除 ES
+        // 5. 删除 ES (通过MQ异步同步)
         try {
-            elasticsearchOperations.delete(String.valueOf(noteId), NoteEs.class);
+            NoteEsSyncMessage message = new NoteEsSyncMessage("DELETE", noteId, null);
+            rabbitTemplate.convertAndSend(MqConstant.NOTE_ES_EXCHANGE, MqConstant.NOTE_ES_SYNC_KEY, message);
+            log.info("Sent ES sync message (DELETE) for note: {}", noteId);
         } catch (Exception e) {
-            log.error("ES删除失败", e);
+            log.error("ES删除消息发送失败", e);
         }
 
         return Result.success(null);
@@ -347,9 +354,10 @@ public class NoteServiceImpl implements NoteService {
                 noteCache.evict(id);
             }
             try {
-                elasticsearchOperations.delete(String.valueOf(id), NoteEs.class);
+                NoteEsSyncMessage message = new NoteEsSyncMessage("DELETE", id, null);
+                rabbitTemplate.convertAndSend(MqConstant.NOTE_ES_EXCHANGE, MqConstant.NOTE_ES_SYNC_KEY, message);
             } catch (Exception e) {
-                log.error("ES删除失败 for id: " + id, e);
+                log.error("ES删除消息发送失败 for id: " + id, e);
             }
         }
 

@@ -17,4 +17,9 @@ public interface EsNoteSyncService {
      * 可选：只同步指定的若干笔记
      */
     void syncNotesToEs(List<Note> notes) throws IOException;
+
+    /**
+     * 手动同步单个笔记
+     */
+    void syncNote(Long noteId);
 }

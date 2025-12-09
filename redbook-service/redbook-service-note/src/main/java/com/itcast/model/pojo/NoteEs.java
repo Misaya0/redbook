@@ -8,7 +8,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 @Document(indexName = "rb_note")
 public class NoteEs {
     @Id
-    private Integer id;
+    private Long id;
     private String title;
     private String content;
     private String image;

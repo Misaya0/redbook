@@ -26,4 +26,11 @@ public class EsAdminController {
         esNoteSyncService.syncAllNotesToEs();
         return "ok";
     }
+
+    @GetMapping("/syncNote")
+    public String syncNote(Long noteId) {
+        log.info("接收到同步单个笔记请求: {}", noteId);
+        esNoteSyncService.syncNote(noteId);
+        return "ok";
+    }
 }

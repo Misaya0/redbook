@@ -13,4 +13,9 @@ public class MqConstant {
 
     public static final String SAVE_ORDER_EXCHANGE = "save.order.exchange";
     public static final String SAVE_ORDER_QUEUE = "save.order.queue";
+
+    // Note ES Sync
+    public static final String NOTE_ES_EXCHANGE = "note.es.exchange";
+    public static final String NOTE_ES_SYNC_QUEUE = "note.es.sync.queue";
+    public static final String NOTE_ES_SYNC_KEY = "note.es.sync.key";
 }
