@@ -1,6 +1,15 @@
 server:
   port: 10010
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: message-service
+        url: /api/message/v3/api-docs
+    enabled: true
 spring:
+  main:
+    web-application-type: reactive
   application:
     name: redbook-gateway
   cloud:
@@ -9,6 +18,13 @@ spring:
         server-addr: 10.1.40.66:8848
     gateway:
       routes:
+        # ============ message-service Swagger(OpenAPI) 文档路由 ============
+        - id: redbook-service-message-api-docs
+          uri: lb://redbook-service-message
+          predicates:
+            - Path=/api/message/v3/api-docs/**
+          filters:
+            - StripPrefix=2   # 去掉 /api/message，转发给下游 /v3/api-docs/**
         # 用户服务路由
         - id: redbook-service-user
           uri: lb://redbook-service-user

@@ -32,12 +32,19 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         // 2.判断是否是登录接口
         String path = request.getURI().getPath();
         log.info("请求接口为：{}", path);
-        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") || path.contains("/note/getNoteList") || path.contains("/user/uploads") || path.contains("/note/uploads") || path.contains("/search")) {
+        if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") ||
+                path.contains("/note/getNoteList") || path.contains("/user/uploads") || path.contains("/note/uploads")
+                || path.contains("/search") || path.contains("/api/message/v3/api-docs")) {
             log.info("请求接口放行");
             return chain.filter(exchange);
         }
-        // 3.获取token
-        String token = request.getHeaders().getFirst("token");
+        // 3. 获取 token：优先从 Authorization 取，其次兼容旧的 token 头
+        String token = request.getHeaders().getFirst("Authorization");
+        if (StringUtils.isNotBlank(token) && token.startsWith("Bearer ")) {
+            token = token.substring(7); // 去掉 "Bearer "
+        } else {
+            token = request.getHeaders().getFirst("token"); // 兼容老客户端
+        }
         // 4.判断token是否为空
         if (StringUtils.isBlank(token)) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);

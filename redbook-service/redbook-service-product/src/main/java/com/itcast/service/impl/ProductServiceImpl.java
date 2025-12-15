@@ -1,10 +1,12 @@
 package com.itcast.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.itcast.mapper.ProductBrowseMapper;
 import com.itcast.mapper.ProductMapper;
 import com.itcast.mapper.ShopMapper;
 import com.itcast.model.dto.ProductDto;
+import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
 import com.itcast.model.pojo.ProductAttribute;
 import com.itcast.model.pojo.ProductBrowse;
@@ -20,6 +22,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,15 +44,19 @@ public class ProductServiceImpl implements ProductService {
     private MongoTemplate mongoTemplate;
 
     @Override
-    public Result<List<Product>> getProductList() {
-        List<Product> products = productMapper.selectList(null);
-        return Result.success(products);
+    public Result<List<Product>> getProductList(Integer pageNum, Integer pageSize) {
+        Page<Product> page = new Page<>(pageNum == null ? 1 : pageNum, pageSize == null ? 10 : pageSize);
+        Page<Product> productPage = productMapper.selectPage(page, null);
+        return Result.success(productPage.getRecords());
     }
 
     @Override
     public Result<ProductVo> getProduct(Integer productId) {
         // 1.获取商品信息
         Product product = productMapper.selectById(productId);
+        if (product == null) {
+            return Result.failure("商品不存在");
+        }
         // 2.获取店铺信息
         Shop shop = shopMapper.selectById(product.getShopId());
         // 获取商品属性
@@ -96,9 +103,10 @@ public class ProductServiceImpl implements ProductService {
 
         // 2.上传商品属性
         ProductAttribute productAttribute = productDto.getProductAttribute();
-        productAttribute.setProduct_id(product.getId());
-        mongoTemplate.insert(productAttribute);
-
+        if (productAttribute != null) {
+            productAttribute.setProduct_id(product.getId());
+            mongoTemplate.insert(productAttribute);
+        }
         return Result.success(null);
     }
 
@@ -109,17 +117,37 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Result<List<Product>> searchProduct(String keyword, Double minPrice, Double maxPrice) {
+    public Result<Void> deleteProduct(Integer productId) {
+        productMapper.deleteById(productId);
+        return Result.success(null);
+    }
+
+    @Override
+    public Result<List<ProductVo>> searchProduct(ProductSearchDto searchDto) {
+        Page<Product> page = new Page<>(searchDto.getPageNum(), searchDto.getPageSize());
         LambdaQueryWrapper<Product> queryWrapper = new LambdaQueryWrapper<>();
-        if (keyword != null && !keyword.isEmpty()) {
-            queryWrapper.like(Product::getName, keyword);
+
+        if (StringUtils.hasText(searchDto.getKeyword())) {
+            queryWrapper.like(Product::getName, searchDto.getKeyword());
         }
-        if (minPrice != null) {
-            queryWrapper.ge(Product::getPrice, minPrice);
+        if (searchDto.getMinPrice() != null) {
+            queryWrapper.ge(Product::getPrice, searchDto.getMinPrice());
         }
-        if (maxPrice != null) {
-            queryWrapper.le(Product::getPrice, maxPrice);
+        if (searchDto.getMaxPrice() != null) {
+            queryWrapper.le(Product::getPrice, searchDto.getMaxPrice());
         }
-        return Result.success(productMapper.selectList(queryWrapper));
+        if (searchDto.getShopId() != null) {
+            queryWrapper.eq(Product::getShopId, searchDto.getShopId());
+        }
+
+        Page<Product> productPage = productMapper.selectPage(page, queryWrapper);
+
+        List<ProductVo> productVos = productPage.getRecords().stream().map(product -> {
+            ProductVo productVo = new ProductVo();
+            BeanUtils.copyProperties(product, productVo);
+            // 这里可以补充更多VO需要的字段，比如店铺名称等
+            return productVo;
+        }).collect(Collectors.toList());
+        return Result.success(productVos, productPage.getTotal());
     }
 }

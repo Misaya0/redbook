@@ -1,6 +1,7 @@
 package com.itcast.controller;
 
 import com.itcast.model.dto.ProductDto;
+import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
 import com.itcast.model.vo.ProductVo;
 import com.itcast.result.Result;
@@ -23,8 +24,10 @@ public class ProductController {
 
     @Operation(summary = "获取商品列表", description = "获取所有商品列表")
     @GetMapping("/getProductList")
-    public Result<List<Product>> getProductList() {
-        return productService.getProductList();
+    public Result<List<Product>> getProductList(
+            @Parameter(description = "页码") @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @Parameter(description = "每页大小") @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return productService.getProductList(pageNum, pageSize);
     }
 
     @Operation(summary = "获取商品详情", description = "根据商品ID获取商品详细信息")
@@ -55,12 +58,17 @@ public class ProductController {
         return productService.updateProduct(product);
     }
 
+    @Operation(summary = "删除商品", description = "删除商品")
+    @DeleteMapping("/delete/{productId}")
+    public Result<Void> deleteProduct(
+            @Parameter(description = "商品ID", required = true) @PathVariable("productId") Integer productId) {
+        return productService.deleteProduct(productId);
+    }
+
     @Operation(summary = "搜索商品", description = "按名称、价格搜索商品")
-    @GetMapping("/search")
-    public Result<List<Product>> search(
-            @Parameter(description = "关键词") @RequestParam(required = false) String keyword,
-            @Parameter(description = "最低价") @RequestParam(required = false) Double minPrice,
-            @Parameter(description = "最高价") @RequestParam(required = false) Double maxPrice) {
-        return productService.searchProduct(keyword, minPrice, maxPrice);
+    @PostMapping("/search")
+    public Result<List<ProductVo>> search(
+            @Parameter(description = "搜索条件") @RequestBody ProductSearchDto searchDto) {
+        return productService.searchProduct(searchDto);
     }
 }

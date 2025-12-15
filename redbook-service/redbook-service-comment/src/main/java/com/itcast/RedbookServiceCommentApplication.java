@@ -1,5 +1,6 @@
 package com.itcast;
 
+import com.itcast.client.NoteClient;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;

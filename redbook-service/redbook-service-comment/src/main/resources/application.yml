@@ -12,6 +12,20 @@ spring:
     url: jdbc:mysql://localhost:3306/rb_note?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
     password: 1234
+  rabbitmq:
+    host: 10.1.40.66
+    port: 5672
+    username: admin
+    password: 123321
+    virtual-host: /
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-interval: 10000ms
+          multiplier: 2
+          max-attempts: 3
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

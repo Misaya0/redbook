@@ -80,11 +80,17 @@ public class AttentionServiceImpl implements AttentionService {
             redisTemplate.opsForSet().add(RedisConstant.ATTENTION_CACHE + ownId, otherId);
 
             // 用户关注，通知消息
-            Message attentionMessage = new Message();
-            attentionMessage.setType(MessageTypeEnum.ATTENTION.getCode());
-            attentionMessage.setNoticeId(otherId);
-            attentionMessage.setObj(attention);
-            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, MqConstant.ATTENTION_KEY, attentionMessage);
+            com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
+            event.setEventId(java.util.UUID.randomUUID().toString());
+            event.setActorId(ownId.longValue());
+            event.setRecipientId(otherId.longValue());
+            event.setType("FOLLOW");
+            event.setTargetType("USER");
+            event.setTargetId(otherId.longValue());
+            event.setTimestamp(System.currentTimeMillis());
+            event.setContentBrief("关注了你");
+            
+            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, "user.followed", event);
         }
         return Result.success(null);
     }

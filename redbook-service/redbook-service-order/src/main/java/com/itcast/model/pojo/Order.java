@@ -51,4 +51,10 @@ public class Order {
      * 状态
      */
     private Integer status;
+
+    /**
+     * 创建时间
+     */
+    @TableField("create_time")
+    private String createTime;
 }

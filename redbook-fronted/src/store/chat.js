@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useUserStore } from './user'
 import { parseDate } from '@/utils/date'
+import { getUnreadSummary } from '@/api/notification'
 
 export const useChatStore = defineStore('chat', () => {
   const socket = ref(null)
@@ -11,6 +12,30 @@ export const useChatStore = defineStore('chat', () => {
   const lastReceivedMessage = ref(null) // 最新收到的一条消息（全局）
   const currentUserId = ref(null)
 
+  // 消息通知未读数
+  const unreadSummary = ref({
+    likeCollect: 0,
+    follow: 0,
+    comment: 0
+  })
+
+  // 获取未读总数
+  const totalUnreadCount = computed(() => {
+    return unreadSummary.value.likeCollect + unreadSummary.value.follow + unreadSummary.value.comment
+  })
+
+  // 初始化获取未读数
+  const fetchUnreadSummary = async () => {
+    try {
+      const res = await getUnreadSummary()
+      if (res) {
+        unreadSummary.value = res
+      }
+    } catch (error) {
+      console.error('获取未读汇总失败', error)
+    }
+  }
+
   // 当前聊天窗口的消息
   const messages = computed(() => {
     if (!currentTalkerId.value) return []
@@ -18,10 +43,22 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   // 连接 WebSocket
-  const connect = () => {
+  const connect = async () => {
     const userStore = useUserStore()
     if (!userStore.token) return
+    
+    // 确保用户信息已加载
+    if (!userStore.userInfo) {
+      try {
+        await userStore.getUserInfo()
+      } catch (e) {
+        console.error('Failed to load user info before connecting WS', e)
+      }
+    }
     currentUserId.value = userStore.userInfo?.id
+
+    // 初始化未读数
+    fetchUnreadSummary()
 
     if (isConnected.value) return
 
@@ -41,6 +78,15 @@ export const useChatStore = defineStore('chat', () => {
           const msg = JSON.parse(event.data)
           console.log('Received message:', msg)
           
+          // 判断是否为通知消息
+          if (msg.group && msg.delta) {
+             // 更新未读数
+             if (unreadSummary.value[msg.group] !== undefined) {
+               unreadSummary.value[msg.group] += msg.delta
+             }
+             return
+          }
+
           // 更新全局最新消息
           lastReceivedMessage.value = msg
 
@@ -179,6 +225,9 @@ export const useChatStore = defineStore('chat', () => {
     setCurrentTalker,
     addMessage,
     setMessages,
-    clearMessages
+    clearMessages,
+    unreadSummary,
+    fetchUnreadSummary,
+    totalUnreadCount
   }
 })

@@ -81,11 +81,17 @@ public class LikeServiceImpl implements LikeService {
             note.setLike(note.getLike() + 1);
 
             // 用户点赞，消息发送
-            Message likeMessage = new Message();
-            likeMessage.setType(MessageTypeEnum.LIKE.getCode());
-            likeMessage.setNoticeId(note.getUserId());
-            likeMessage.setObj(like);
-            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, MqConstant.LIKE_KEY, likeMessage);
+            com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
+            event.setEventId(java.util.UUID.randomUUID().toString());
+            event.setActorId(userId.longValue());
+            event.setRecipientId(note.getUserId().longValue());
+            event.setType("LIKE");
+            event.setTargetType("NOTE");
+            event.setTargetId(noteId);
+            event.setTimestamp(System.currentTimeMillis());
+            event.setContentBrief("赞了你的笔记");
+            
+            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, "note.liked", event);
         }
         // 2.更新点赞数
         noteMapper.updateById(note);

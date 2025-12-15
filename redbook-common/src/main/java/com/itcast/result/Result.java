@@ -24,14 +24,30 @@ public class Result<T> {
     public Result() {
     }
 
+    /**
+     * 总条数
+     */
+    private Long total;
+
     public Result(String message, int code, T data) {
         this.message = message;
         this.code = code;
         this.data = data;
     }
 
+    public Result(String message, int code, T data, Long total) {
+        this.message = message;
+        this.code = code;
+        this.data = data;
+        this.total = total;
+    }
+
     public static <T> Result<T> success(T data) {
         return new Result<>("操作成功", 200, data);
+    }
+
+    public static <T> Result<T> success(T data, Long total) {
+        return new Result<>("操作成功", 200, data, total);
     }
 
     public static <T> Result<T> failure(String message) {

@@ -19,11 +19,13 @@
           v-if="isSelf(msg)"
           :src="getImageUrl(userStore.userInfo?.image, defaultAvatar)"
           class="avatar-img"
+          @click="goToProfile(msg.senderId)"
         />
         <img 
           v-else
           :src="getImageUrl(talkerAvatar, defaultAvatar)"
           class="avatar-img"
+          @click="goToProfile(msg.senderId)"
         />
         <div class="message-content">
           <div class="bubble">
@@ -85,6 +87,12 @@ const scrollToBottom = () => {
       messageContainer.value.scrollTop = messageContainer.value.scrollHeight
     }
   })
+}
+
+const goToProfile = (userId) => {
+  if (userId) {
+    router.push(`/user/${userId}`)
+  }
 }
 
 // 监听消息变化，自动滚动到底部
@@ -258,6 +266,7 @@ onUnmounted(() => {
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid #eee;
+  cursor: pointer;
 }
 
 .message-content {

@@ -9,6 +9,12 @@ import Search from '@/views/Search.vue'
 import UserProfile from '@/views/UserProfile.vue'
 import MessageList from '@/views/Message/MessageList.vue'
 import ChatRoom from '@/views/Message/ChatRoom.vue'
+import LikeCollect from '@/views/Message/LikeCollect.vue'
+import NewFollow from '@/views/Message/NewFollow.vue'
+import CommentAt from '@/views/Message/CommentAt.vue'
+import ProductList from '@/views/Product/ProductList.vue'
+import OrderList from '@/views/Order/OrderList.vue'
+import NoteDetail from '@/views/NoteDetail.vue'
 
 const routes = [
   {
@@ -22,10 +28,45 @@ const routes = [
     component: Explore
   },
   {
+    path: '/products',
+    name: 'ProductList',
+    component: ProductList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/orders',
+    name: 'OrderList',
+    component: OrderList,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/message',
     name: 'Message',
     component: MessageList,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/message/like-collect',
+    name: 'LikeCollect',
+    component: LikeCollect,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/message/new-follow',
+    name: 'NewFollow',
+    component: NewFollow,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/message/comment-at',
+    name: 'CommentAt',
+    component: CommentAt,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/note/:id',
+    name: 'NoteDetail',
+    component: NoteDetail
   },
   {
     path: '/message/chat/:id',

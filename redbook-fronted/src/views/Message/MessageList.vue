@@ -3,6 +3,33 @@
     <div class="header">
       <h2>消息</h2>
     </div>
+
+    <!-- 消息类型入口 -->
+    <div class="action-buttons">
+      <div class="action-item" @click="handleAction('likeCollect')">
+        <div class="icon-box like-bg">
+          <span class="icon">❤️</span>
+          <div v-if="unreadSummary.likeCollect > 0" class="badge">{{ unreadSummary.likeCollect > 99 ? '99+' : unreadSummary.likeCollect }}</div>
+        </div>
+        <span class="action-text">赞和收藏</span>
+      </div>
+      
+      <div class="action-item" @click="handleAction('follow')">
+        <div class="icon-box follow-bg">
+          <span class="icon">👤</span>
+          <div v-if="unreadSummary.follow > 0" class="badge">{{ unreadSummary.follow > 99 ? '99+' : unreadSummary.follow }}</div>
+        </div>
+        <span class="action-text">新增关注</span>
+      </div>
+      
+      <div class="action-item" @click="handleAction('comment')">
+        <div class="icon-box comment-bg">
+          <span class="icon">💬</span>
+          <div v-if="unreadSummary.comment > 0" class="badge">{{ unreadSummary.comment > 99 ? '99+' : unreadSummary.comment }}</div>
+        </div>
+        <span class="action-text">评论和@</span>
+      </div>
+    </div>
     
     <div class="conversation-list">
       <div v-if="loading" class="loading">加载中...</div>
@@ -44,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getConversationList } from '@/api/chat'
 import { useChatStore } from '@/store/chat'
@@ -55,6 +82,22 @@ const router = useRouter()
 const chatStore = useChatStore()
 const conversations = ref([])
 const loading = ref(true)
+
+// 使用 store 中的未读数
+const unreadSummary = computed(() => chatStore.unreadSummary)
+
+const handleAction = (type) => {
+  if (type === 'likeCollect') {
+    router.push('/message/like-collect')
+  } else if (type === 'follow') {
+    router.push('/message/new-follow')
+  } else if (type === 'comment') {
+    router.push('/message/comment-at')
+  } else {
+    console.log('点击消息类型:', type)
+    // TODO: 跳转到对应的消息列表页
+  }
+}
 
 const fetchConversations = async () => {
   try {
@@ -104,7 +147,7 @@ const goToChat = (userId) => {
 
 onMounted(() => {
   fetchConversations()
-  // 确保 WebSocket 连接
+  // 确保 WebSocket 连接 (store内会自动获取 unreadSummary)
   chatStore.connect()
 })
 </script>
@@ -126,6 +169,78 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: space-around;
+  padding: 20px 0;
+  border-bottom: 8px solid #f5f5f5;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.action-item:active {
+  transform: scale(0.95);
+}
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.like-bg {
+  background-color: #ffebef;
+  color: #ff2442;
+}
+
+.follow-bg {
+  background-color: #e8f4ff;
+  color: #2486ff;
+}
+
+.comment-bg {
+  background-color: #e6fffa;
+  color: #00b386;
+}
+
+.icon {
+  font-size: 24px;
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background-color: #ff2442;
+  color: white;
+  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 14px;
+  text-align: center;
+  padding: 0 4px;
+  border-radius: 9px;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+}
+
+.action-text {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
 }
 
 .conversation-item {

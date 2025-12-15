@@ -36,7 +36,7 @@ export const verifyLogin = (phone, code) => {
  * @returns {Promise}
  */
 export const getUserInfo = () => {
-  return request.get('/user/getInfo')
+  return request.get('/user/getInfo', { skipErrorHandler: true })
 }
 
 /**

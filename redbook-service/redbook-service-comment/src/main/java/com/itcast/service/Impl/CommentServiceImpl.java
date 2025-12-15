@@ -1,18 +1,22 @@
 package com.itcast.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.itcast.client.NoteClient;
 import com.itcast.client.UserClient;
 import com.itcast.mapper.CommentMapper;
 import com.itcast.model.dto.CommentDto;
+import com.itcast.model.event.MessageEvent;
 import com.itcast.model.pojo.Comment;
 import com.itcast.model.pojo.User;
 import com.itcast.model.vo.CommentVo;
+import com.itcast.model.vo.NoteVo;
 import com.itcast.result.Result;
 import com.itcast.service.CommentService;
 import com.itcast.context.UserContext;
 import com.itcast.util.DealTimeUtil;
 import com.itcast.util.DiffDayUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,6 +45,12 @@ public class CommentServiceImpl implements CommentService {
     @Autowired
     private UserClient userClient;
 
+    @Autowired
+    private NoteClient noteClient;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
     @Override
     public Result<Void> postComment(CommentDto commentDto) {
         Integer userId = UserContext.getUserId();
@@ -68,6 +78,45 @@ public class CommentServiceImpl implements CommentService {
         }
 
         commentMapper.insert(comment);
+
+        // 发送通知消息
+        try {
+            MessageEvent event = new MessageEvent();
+            event.setEventId(java.util.UUID.randomUUID().toString());
+            event.setActorId(userId.longValue());
+            event.setTimestamp(System.currentTimeMillis());
+            event.setContentBrief(comment.getContent().length() > 50 ? comment.getContent().substring(0, 50) : comment.getContent());
+
+            if (comment.getParentId() != null && comment.getParentId() != 0) {
+                // 回复评论
+                if (comment.getTargetUserId() != null && !comment.getTargetUserId().equals(userId)) {
+                    event.setRecipientId(comment.getTargetUserId().longValue());
+                    event.setType("REPLY");
+                    event.setTargetType("COMMENT");
+                    event.setTargetId(comment.getId());
+                    rabbitTemplate.convertAndSend(com.itcast.constant.MqConstant.MESSAGE_NOTICE_EXCHANGE, "comment.replied", event);
+                    log.info("发送回复评论消息");
+                }
+            } else {
+                // 评论笔记
+                event.setType("COMMENT");
+                event.setTargetType("NOTE");
+                event.setTargetId(comment.getNoteId());
+                // 查询笔记作者
+                Result<NoteVo> noteResult = noteClient.getNote(comment.getNoteId());
+                if (noteResult != null && noteResult.getData() != null) {
+                    Integer noteAuthorId = noteResult.getData().getUserId();
+                    if (!noteAuthorId.equals(userId)) {
+                        event.setRecipientId(noteAuthorId.longValue());
+                        rabbitTemplate.convertAndSend(com.itcast.constant.MqConstant.MESSAGE_NOTICE_EXCHANGE, "note.commented", event);
+                        log.info("发送评论笔记消息");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("发送评论通知失败", e);
+        }
+
         return Result.success(null);
     }
 

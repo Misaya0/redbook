@@ -75,4 +75,34 @@ public class MqConfig {
                 .to(messageNoticeExchange())
                 .with(MqConstant.COLLECTION_KEY);
     }
+
+    @Bean
+    public Queue notificationQueue() {
+        return QueueBuilder.durable("message.notification.queue").build();
+    }
+
+    @Bean
+    public Binding notificationBindingFollow() {
+        return BindingBuilder.bind(notificationQueue()).to(messageNoticeExchange()).with("user.followed");
+    }
+
+    @Bean
+    public Binding notificationBindingLike() {
+        return BindingBuilder.bind(notificationQueue()).to(messageNoticeExchange()).with("note.liked");
+    }
+
+    @Bean
+    public Binding notificationBindingCollect() {
+        return BindingBuilder.bind(notificationQueue()).to(messageNoticeExchange()).with("note.collected");
+    }
+
+    @Bean
+    public Binding notificationBindingComment() {
+        return BindingBuilder.bind(notificationQueue()).to(messageNoticeExchange()).with("note.commented");
+    }
+
+    @Bean
+    public Binding notificationBindingReply() {
+        return BindingBuilder.bind(notificationQueue()).to(messageNoticeExchange()).with("comment.replied");
+    }
 }

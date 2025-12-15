@@ -44,4 +44,9 @@ public class OrderDto implements Serializable {
      * 消息唯一标识（用于幂等性控制）
      */
     private String messageId;
+
+    /**
+     * 用户ID
+     */
+    private Integer userId;
 }

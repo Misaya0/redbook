@@ -77,11 +77,17 @@ public class CollectionServiceImpl implements CollectionService {
             // 更新收藏数
             note.setCollection(note.getCollection() + 1);
             // 用户收藏，消息发送
-            Message collectionMessage = new Message();
-            collectionMessage.setType(MessageTypeEnum.COLLECTION.getCode());
-            collectionMessage.setNoticeId(note.getUserId());
-            collectionMessage.setObj(collection);
-            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, MqConstant.COLLECTION_KEY, collectionMessage);
+            com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
+            event.setEventId(java.util.UUID.randomUUID().toString());
+            event.setActorId(userId.longValue());
+            event.setRecipientId(note.getUserId().longValue());
+            event.setType("COLLECT");
+            event.setTargetType("NOTE");
+            event.setTargetId(noteId);
+            event.setTimestamp(System.currentTimeMillis());
+            event.setContentBrief("收藏了你的笔记");
+            
+            rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, "note.collected", event);
         }
         // 2.更新收藏数
         noteMapper.updateById(note);

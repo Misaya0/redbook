@@ -44,6 +44,10 @@ request.interceptors.response.use(
 
     // 假设后端返回格式：{ code: 200, message: 'success', data: ... }
     if (data.code === 200) {
+      // 如果包含 total 字段且不为 null，说明是分页结果，返回 { list, total }
+      if (data.total != null) {
+        return { list: data.data, total: data.total }
+      }
       return data.data
     } else {
       // 统一错误处理
@@ -52,6 +56,11 @@ request.interceptors.response.use(
     }
   },
   async (error) => {
+    // 如果配置了跳过错误处理，直接 reject
+    if (error.config && error.config.skipErrorHandler) {
+      return Promise.reject(error)
+    }
+
     // 统一错误处理
     if (error.response) {
       // 服务器响应错误

@@ -6,7 +6,14 @@
         <nav style="display: flex; gap: 20px;">
           <router-link to="/" style="text-decoration: none; color: #666; font-weight: 500;">探索</router-link>
           <router-link to="/follow" style="text-decoration: none; color: #666; font-weight: 500;">关注</router-link>
-          <router-link to="/message" style="text-decoration: none; color: #666; font-weight: 500;">消息</router-link>
+          <router-link to="/message" style="text-decoration: none; color: #666; font-weight: 500; position: relative;">
+            消息
+            <span v-if="chatStore.totalUnreadCount > 0" style="position: absolute; top: -8px; right: -12px; background: #ff2442; color: white; border-radius: 10px; padding: 0 4px; font-size: 10px; min-width: 16px; height: 16px; line-height: 16px; text-align: center; transform: scale(0.8);">
+              {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+            </span>
+          </router-link>
+          <router-link to="/products" style="text-decoration: none; color: #666; font-weight: 500;">商城</router-link>
+          <router-link to="/orders" style="text-decoration: none; color: #666; font-weight: 500;">订单</router-link>
         </nav>
       </div>
 
@@ -110,13 +117,20 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { useChatStore } from '@/store/chat'
 import { useModal } from '@/utils/modal'
 import { searchApi } from '@/api/search'
 import { getImageUrl } from '@/utils/image'
 
 const router = useRouter()
 const userStore = useUserStore()
+const chatStore = useChatStore()
 const { showConfirm, showAlert } = useModal()
+
+// 建立 WebSocket 连接以接收实时通知
+if (userStore.isLoggedIn) {
+  chatStore.connect()
+}
 
 const searchKeyword = ref('')
 const suggestions = ref([])
