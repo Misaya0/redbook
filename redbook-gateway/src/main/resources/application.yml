@@ -41,11 +41,11 @@ spring:
           filters:
             - StripPrefix=1
 
-        # 商品服务路由
+        # 商品服务路由 (含店铺)
         - id: redbook-service-product
           uri: lb://redbook-service-product
           predicates:
-            - Path=/api/product/**
+            - Path=/api/product/**, /api/shop/**
           filters:
             - StripPrefix=1
 

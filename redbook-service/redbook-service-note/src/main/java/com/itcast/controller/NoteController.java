@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -121,15 +122,23 @@ public class NoteController {
         return noteService.getNote(noteId);
     }
 
+    @Operation(summary = "获取关联商品的笔记", description = "获取关联指定商品ID的热门笔记")
+    @GetMapping("/getRelatedNotes/{productId}")
+    public Result<List<NoteVo>> getRelatedNotes(
+            @Parameter(description = "商品ID", required = true) @PathVariable("productId") Long productId) {
+        return noteService.getRelatedNotes(productId);
+    }
+
     @Operation(summary = "发布笔记", description = "发布一篇新的笔记，包含图片、标题、内容和位置信息")
-    @PostMapping("/postNote")
+    @PostMapping(value = "/postNote", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<Void> postNote(
-            @Parameter(description = "笔记图片", required = true) @RequestParam("image") MultipartFile file,
+            @Parameter(description = "笔记图片", required = false) @RequestParam("image") MultipartFile file,
             @Parameter(description = "笔记标题", required = true) @RequestParam("title") String title,
             @Parameter(description = "笔记内容", required = true) @RequestParam("content") String content,
             @Parameter(description = "经度", required = true) @RequestParam("longitude") String longitude,
             @Parameter(description = "纬度", required = true) @RequestParam("latitude") String latitude,
-            @Parameter(description = "笔记类型", required = false) @RequestParam(value = "type", required = false) String type) throws IOException, InterruptedException {
+            @Parameter(description = "笔记类型", required = false) @RequestParam(value = "type", required = false) String type,
+            @Parameter(description = "关联商品ID", required = false) @RequestParam(value = "productId", required = false) Long productId) throws IOException, InterruptedException {
         NoteDto dto = new NoteDto();
         dto.setFile(file);
         dto.setTitle(title);
@@ -139,6 +148,7 @@ public class NoteController {
         dto.setLatitude(Double.valueOf(latitude));
         dto.setLike(0);
         dto.setCollection(0);
+        dto.setProductId(productId);
         return noteService.postNote(dto);
     }
 

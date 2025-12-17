@@ -40,6 +40,14 @@
               <div class="note-content">
                 <h2 class="note-title">{{ note.title }}</h2>
                 <p class="note-desc">{{ note.content }}</p>
+                
+                <!-- 商品挂链卡片 -->
+                <div class="product-tag" v-if="note.productId" @click="navigateToProduct(note.productId)">
+                  <div class="product-icon">🛍️</div>
+                  <div class="product-text">查看同款商品</div>
+                  <div class="arrow">›</div>
+                </div>
+
                 <div class="note-meta">
                   <span class="date">{{ note.time }}</span>
                   <span class="location" v-if="note.address">{{ note.address }}</span>
@@ -215,6 +223,12 @@ const replyingTo = ref(null) // 当前正在回复的评论（或子评论）
 const inputPlaceholder = ref('说点什么...')
 const defaultAvatar = 'https://via.placeholder.com/40x40/ff2442/ffffff?text=U'
 const defaultImage = 'https://via.placeholder.com/600x800/f0f0f0/999999?text=Loading'
+
+const navigateToProduct = (productId) => {
+  // 先关闭弹窗，再跳转
+  emit('update:visible', false)
+  router.push(`/product/${productId}`)
+}
 
 const handleClose = () => {
   emit('update:visible', false)
@@ -629,6 +643,35 @@ watch(() => props.visible, (newVal) => {
   color: #999;
   display: flex;
   gap: 12px;
+}
+
+.product-tag {
+  display: flex;
+  align-items: center;
+  background: #f8f8f8;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 10px 0;
+  cursor: pointer;
+  border: 1px solid #eee;
+}
+
+.product-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.product-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+}
+
+.arrow {
+  color: #999;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .divider {

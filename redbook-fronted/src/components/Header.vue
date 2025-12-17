@@ -4,16 +4,30 @@
       <div style="display: flex; align-items: center; gap: 30px;">
         <h1 style="color: #ff2442; font-size: 24px; font-weight: bold; cursor: pointer;" @click="router.push('/')">小红书</h1>
         <nav style="display: flex; gap: 20px;">
-          <router-link to="/" style="text-decoration: none; color: #666; font-weight: 500;">探索</router-link>
-          <router-link to="/follow" style="text-decoration: none; color: #666; font-weight: 500;">关注</router-link>
-          <router-link to="/message" style="text-decoration: none; color: #666; font-weight: 500; position: relative;">
-            消息
-            <span v-if="chatStore.totalUnreadCount > 0" style="position: absolute; top: -8px; right: -12px; background: #ff2442; color: white; border-radius: 10px; padding: 0 4px; font-size: 10px; min-width: 16px; height: 16px; line-height: 16px; text-align: center; transform: scale(0.8);">
-              {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
-            </span>
-          </router-link>
-          <router-link to="/products" style="text-decoration: none; color: #666; font-weight: 500;">商城</router-link>
-          <router-link to="/orders" style="text-decoration: none; color: #666; font-weight: 500;">订单</router-link>
+          <template v-if="userStore.userInfo?.role === 1">
+            <!-- 商家导航 -->
+            <router-link to="/merchant/products" style="text-decoration: none; color: #666; font-weight: 500;">商品</router-link>
+            <router-link to="/orders" style="text-decoration: none; color: #666; font-weight: 500;">订单</router-link>
+            <router-link to="/message" style="text-decoration: none; color: #666; font-weight: 500; position: relative;">
+              消息
+              <span v-if="chatStore.totalUnreadCount > 0" style="position: absolute; top: -8px; right: -12px; background: #ff2442; color: white; border-radius: 10px; padding: 0 4px; font-size: 10px; min-width: 16px; height: 16px; line-height: 16px; text-align: center; transform: scale(0.8);">
+                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+              </span>
+            </router-link>
+          </template>
+          <template v-else>
+            <!-- 普通用户导航 -->
+            <router-link to="/" style="text-decoration: none; color: #666; font-weight: 500;">探索</router-link>
+            <router-link to="/follow" style="text-decoration: none; color: #666; font-weight: 500;">关注</router-link>
+            <router-link to="/message" style="text-decoration: none; color: #666; font-weight: 500; position: relative;">
+              消息
+              <span v-if="chatStore.totalUnreadCount > 0" style="position: absolute; top: -8px; right: -12px; background: #ff2442; color: white; border-radius: 10px; padding: 0 4px; font-size: 10px; min-width: 16px; height: 16px; line-height: 16px; text-align: center; transform: scale(0.8);">
+                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+              </span>
+            </router-link>
+            <router-link to="/products" style="text-decoration: none; color: #666; font-weight: 500;">商城</router-link>
+            <router-link to="/orders" style="text-decoration: none; color: #666; font-weight: 500;">订单</router-link>
+          </template>
         </nav>
       </div>
 
@@ -90,7 +104,7 @@
           <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 5px 10px; border-radius: 20px; transition: background 0.3s ease;"
                @mouseenter="$event.target.style.background = '#f8f8f8'"
                @mouseleave="$event.target.style.background = 'transparent'"
-               @click="$router.push('/profile')">
+               @click="handleProfileClick">
             <img
               :src="userAvatar"
               alt="用户头像"
@@ -140,6 +154,14 @@ const showSuggestions = ref(false)
 const userAvatar = computed(() => {
   return getImageUrl(userStore.userInfo?.image, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')
 })
+
+const handleProfileClick = () => {
+  if (userStore.userInfo?.role === 1) {
+    router.push('/merchant/profile')
+  } else {
+    router.push('/profile')
+  }
+}
 
 const goToLogin = () => {
   router.push('/login')

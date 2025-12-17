@@ -17,17 +17,26 @@ export const useUserStore = defineStore('user', () => {
       const response = await verifyLoginAPI(phone, code)
       console.log('用户状态管理 - 登录API响应:', response)
 
-      // 后端返回的response经过拦截器处理后，直接就是token字符串
-      if (response) {
+      // 后端返回的response现在是对象: { token: '...', role: 0 }
+      if (response && response.token) {
         // 保存token
-        token.value = response
-        localStorage.setItem('token', response)
-
+        token.value = response.token
+        localStorage.setItem('token', response.token)
+        
+        // 保存角色 (可选)
+        const role = response.role
+        
         // 获取完整用户信息
         await getUserInfo()
 
         console.log('用户状态管理 - 登录成功，用户信息:', userInfo.value)
-        return { success: true, message: '登录成功' }
+        return { success: true, message: '登录成功', role: role }
+      } else if (typeof response === 'string') {
+        // 兼容旧接口 (如果后端没更新完全)
+        token.value = response
+        localStorage.setItem('token', response)
+        await getUserInfo()
+        return { success: true, message: '登录成功', role: 0 }
       } else {
         console.log('用户状态管理 - 登录失败：未获取到token')
         return { success: false, message: '登录失败：未获取到token' }

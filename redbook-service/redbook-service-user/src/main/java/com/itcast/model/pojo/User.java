@@ -79,4 +79,10 @@ public class User implements Serializable {
      */
     @TableField("time")
     private String time;
+
+    /**
+     * 角色: 0-普通, 1-商家
+     */
+    @TableField("role")
+    private Integer role;
 }

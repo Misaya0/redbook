@@ -27,9 +27,9 @@ public class LoginController {
         return loginService.send(phone);
     }
 
-    @Operation(summary = "验证登录", description = "验证手机号码和验证码，登录成功后返回token")
+    @Operation(summary = "验证登录", description = "验证手机号码和验证码，登录成功后返回token和角色")
     @GetMapping("/verify")
-    public Result<String> verify(
+    public Result<com.itcast.model.vo.LoginVo> verify(
             @Parameter(description = "登录信息（手机号和验证码）", required = true) LoginDto loginDto) {
         return loginService.verify(loginDto);
     }

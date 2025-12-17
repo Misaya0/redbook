@@ -54,4 +54,10 @@ public class Shop implements Serializable {
      */
     @TableField("user_id")
     private Integer userId;
+
+    /**
+     * 挂链授权模式: 0-自动, 1-手动
+     */
+    @TableField("link_auth_mode")
+    private Integer linkAuthMode;
 }

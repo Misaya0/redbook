@@ -8,6 +8,8 @@ import com.itcast.entity.Conversation;
 import com.itcast.mapper.ChatMessageMapper;
 import com.itcast.service.IChatMessageService;
 import com.itcast.service.IConversationService;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import static com.itcast.session.Session.getChannel;
 
 @Service
 @Slf4j
@@ -55,11 +59,11 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         updateReceiverConversation(senderId, receiverId, content);
 
         // 4. 如果接收方在线，则实时推送消息
-        io.netty.channel.Channel channel = com.itcast.session.Session.getChannel(receiverId.intValue());
+        Channel channel = getChannel(receiverId.intValue());
         if (channel != null && channel.isActive()) {
             try {
                 String json = objectMapper.writeValueAsString(message);
-                channel.writeAndFlush(new io.netty.handler.codec.http.websocketx.TextWebSocketFrame(json));
+                channel.writeAndFlush(new TextWebSocketFrame(json));
             } catch (Exception e) {
                 log.error("序列化消息失败", e);
             }

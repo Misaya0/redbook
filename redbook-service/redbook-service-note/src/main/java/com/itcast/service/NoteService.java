@@ -19,6 +19,8 @@ public interface NoteService {
 
     Result<Void> updateNote(NoteDto dto) throws IOException;
 
+    Result<List<NoteVo>> getRelatedNotes(Long productId);
+
     Result<Void> deleteNote(Long noteId);
 
     Result<Void> batchDeleteNotes(List<Long> noteIds);

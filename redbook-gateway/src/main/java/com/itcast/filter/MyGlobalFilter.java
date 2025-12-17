@@ -33,7 +33,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
         log.info("请求接口为：{}", path);
         if (path.contains("/user/send") || path.contains("/user/verify") || path.contains("/note/v2/api-docs") ||
-                path.contains("/note/getNoteList") || path.contains("/user/uploads") || path.contains("/note/uploads")
+                path.contains("/note/getNoteList") || path.contains("/user/uploads") || path.contains("/note/uploads") || path.contains("/product/uploads")
                 || path.contains("/search") || path.contains("/api/message/v3/api-docs")) {
             log.info("请求接口放行");
             return chain.filter(exchange);

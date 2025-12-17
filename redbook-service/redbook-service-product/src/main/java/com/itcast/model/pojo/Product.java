@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Data
 @TableName("rb_product")
@@ -17,7 +18,19 @@ public class Product implements Serializable {
      * 主键
      */
     @TableId(type = IdType.AUTO)
-    private Integer id;
+    private Long id;
+
+    /**
+     * 店铺ID
+     */
+    @TableField("shop_id")
+    private Long shopId;
+
+    /**
+     * 分类ID
+     */
+    @TableField("category_id")
+    private Long categoryId;
 
     /**
      * 商品名称
@@ -26,43 +39,44 @@ public class Product implements Serializable {
     private String name;
 
     /**
-     * 商品价格
+     * 副标题/卖点
+     */
+    @TableField("title")
+    private String title;
+
+    /**
+     * 展示价格 (起售价)
      */
     @TableField("price")
     private Double price;
 
     /**
-     * 商品图片
+     * 主图
      */
-    @TableField("image")
-    private String image;
+    @TableField("main_image")
+    private String mainImage;
 
     /**
-     * 发布时间
+     * 详情图(JSON数组)
      */
-    @TableField("time")
-    private String time;
+    @TableField("detail_images")
+    private String detailImages;
 
     /**
-     * 销量
+     * 状态: 0-下架, 1-上架
      */
-    @TableField("sales")
-    private Integer sales;
+    @TableField("status")
+    private Integer status;
 
     /**
-     * 用户id
+     * 创建时间
      */
-    @TableField("user_id")
-    private Integer userId;
+    @TableField("create_time")
+    private LocalDateTime createTime;
 
     /**
-     * 店铺id
+     * 更新时间
      */
-    @TableField("shop_id")
-    private Integer shopId;
-
-    /**
-     * 库存
-     */
-    private Integer stock;
+    @TableField("update_time")
+    private LocalDateTime updateTime;
 }

@@ -1,4 +1,5 @@
-import request from './request';
+// @ts-ignore
+import request from './request.js';
 
 export interface Order {
     id?: number;

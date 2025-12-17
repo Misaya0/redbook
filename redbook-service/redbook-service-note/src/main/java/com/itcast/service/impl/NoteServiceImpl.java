@@ -1,5 +1,6 @@
 package com.itcast.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itcast.annotation.SendMessage;
 import com.itcast.client.CommentClient;
 import com.itcast.client.UserClient;
@@ -286,6 +287,33 @@ public class NoteServiceImpl implements NoteService {
         }
 
         return Result.success(null);
+    }
+
+    @Override
+    public Result<List<NoteVo>> getRelatedNotes(Long productId) {
+        // 1. 查询关联该商品的笔记 (按点赞数降序取前2条)
+        LambdaQueryWrapper<Note> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Note::getProductId, productId)
+                    .orderByDesc(Note::getLike)
+                    .last("limit 2");
+        
+        List<Note> notes = noteMapper.selectList(queryWrapper);
+        
+        // 2. 转换为 VO
+        List<NoteVo> noteVos = notes.stream().map(note -> {
+            NoteVo vo = new NoteVo();
+            BeanUtils.copyProperties(note, vo);
+            // 简单填充用户信息，不做复杂查询
+            try {
+                User user = userClient.getUserById(note.getUserId()).getData();
+                vo.setUser(user);
+            } catch (Exception e) {
+                log.error("获取笔记作者失败", e);
+            }
+            return vo;
+        }).collect(java.util.stream.Collectors.toList());
+        
+        return Result.success(noteVos);
     }
 
     @Override

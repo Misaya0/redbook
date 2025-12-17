@@ -46,7 +46,7 @@ public class LoginServiceImpl implements LoginService {
     }
 
     @Override
-    public Result<String> verify(LoginDto loginDto) {
+    public Result<com.itcast.model.vo.LoginVo> verify(LoginDto loginDto) {
         // 1.从redis获取验证码
         String cacheCode = redisTemplate.opsForValue().get(
                 RedisConstant.PHONE_CODE.concat(loginDto.getPhone()));
@@ -61,6 +61,8 @@ public class LoginServiceImpl implements LoginService {
         queryWrapper.eq(User::getPhone, loginDto.getPhone());
         User dbUser = userMapper.selectOne(queryWrapper);
         Integer userId;
+        Integer role = 0;
+        
         // 5.判断用户是否存在
         if (dbUser == null) {
             // 5.1 注册
@@ -71,10 +73,12 @@ public class LoginServiceImpl implements LoginService {
             // 5.2 生成小红书号
             Long number = NumberUtil.getNumber();
             user.setNumber(number);
+            user.setRole(0); // 默认为普通用户
             userMapper.insert(user);
             userId = user.getId();
         } else {
             userId = dbUser.getId();
+            role = dbUser.getRole();
         }
         // 6.生成token
         String token = JwtUtil.createToken(userId);
@@ -82,7 +86,11 @@ public class LoginServiceImpl implements LoginService {
         // 向mq中发送消息
         rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, MqConstant.LOGIN_KEY, userId);
 
-        // 7.返回token
-        return Result.success(token);
+        // 7.返回结果
+        com.itcast.model.vo.LoginVo loginVo = new com.itcast.model.vo.LoginVo();
+        loginVo.setToken(token);
+        loginVo.setRole(role);
+        
+        return Result.success(loginVo);
     }
 }

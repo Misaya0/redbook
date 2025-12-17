@@ -64,6 +64,14 @@
       <!-- 标签页导航 -->
       <div class="tabs-nav">
         <div
+            v-if="userInfo.role === 1"
+            class="tab-item"
+            :class="{ active: currentTab === 'products' }"
+            @click="switchTab('products')"
+        >
+          商品
+        </div>
+        <div
             class="tab-item"
             :class="{ active: currentTab === 'notes' }"
             @click="switchTab('notes')"
@@ -93,6 +101,30 @@
               <p>暂无内容</p>
             </div>
 
+            <!-- 商品列表 -->
+            <div v-else-if="currentTab === 'products'" class="product-grid">
+              <div 
+                v-for="product in currentList" 
+                :key="product.id" 
+                class="product-card"
+                @click="$router.push(`/product/${product.id}`)"
+              >
+                <div class="image-wrapper">
+                  <img :src="getImageUrl(product.mainImage)" class="product-image" loading="lazy"/>
+                </div>
+                <div class="product-info">
+                  <h3 class="product-title">{{ product.name }}</h3>
+                  <div class="price-row">
+                    <span class="price">
+                      <span class="symbol">¥</span>{{ product.price }}
+                    </span>
+                    <span class="sales">{{ product.sales || 0 }}人付款</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 笔记/收藏列表 -->
             <div v-else class="note-grid">
               <PostCard
                   v-for="note in currentList"
@@ -154,7 +186,9 @@ import {ref, computed, onMounted, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {useUserStore} from '@/store/user'
 import {getUserById, isAttention, toggleAttention, getAttentionList, getFansList} from '@/api/user'
-import {getNoteListByUserId, getNoteListByCollectionUserId} from '@/api/note'
+import { getNoteListByUserId, getNoteListByCollectionUserId } from '@/api/note'
+import { getShopByUserId } from '@/api/shop'
+import { getProductsByShop } from '@/api/product'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 import { getImageUrl } from '@/utils/image'
@@ -183,13 +217,17 @@ const userList = ref([])
 const userListLoading = ref(false)
 
 // 标签页与列表
-const currentTab = ref('notes') // 'notes' | 'collection'
+const currentTab = ref('notes') // 'notes' | 'collection' | 'products'
 const notesList = ref([])
 const collectionList = ref([])
+const productsList = ref([])
 const listLoading = ref(false)
 const page = ref(1)
 const pageSize = 12
 const hasMore = ref(true)
+
+// 店铺信息
+const shopInfo = ref(null)
 
 // 笔记详情
 const showNoteDetail = ref(false)
@@ -197,12 +235,27 @@ const currentNoteId = ref(null)
 
 // 样式计算
 const activeBarStyle = computed(() => {
-  return {
-    transform: currentTab.value === 'notes' ? 'translateX(0)' : 'translateX(100%)'
+  if (userInfo.value.role !== 1) {
+    return {
+      transform: currentTab.value === 'notes' ? 'translateX(0)' : 'translateX(100%)',
+      width: '50%'
+    }
+  } else {
+    // 商家有三个Tab
+    const width = 100 / 3
+    let index = 0
+    if (currentTab.value === 'products') index = 0
+    if (currentTab.value === 'notes') index = 1
+    if (currentTab.value === 'collection') index = 2
+    return {
+      transform: `translateX(${index * 100}%)`,
+      width: `${width}%`
+    }
   }
 })
 
 const currentList = computed(() => {
+  if (currentTab.value === 'products') return productsList.value
   return currentTab.value === 'notes' ? notesList.value : collectionList.value
 })
 
@@ -215,6 +268,22 @@ const fetchUserInfo = async () => {
     const res = await getUserById(userId.value)
     if (res) {
       userInfo.value = res
+      
+      // 如果是商家，获取店铺信息并默认展示商品Tab
+      if (res.role === 1) {
+        try {
+          const shopRes = await getShopByUserId(res.id)
+          if (shopRes) {
+            shopInfo.value = shopRes
+            currentTab.value = 'products'
+            // 切换到商品Tab后立即加载商品列表
+            loadList()
+          }
+        } catch (e) {
+          console.error('获取店铺信息失败', e)
+        }
+      }
+      
       // 检查关注状态
       checkAttention()
       // 加载统计数据
@@ -340,30 +409,42 @@ const loadList = async (isLoadMore = false) => {
   listLoading.value = true
 
   try {
-    const api = currentTab.value === 'notes' ? getNoteListByUserId : getNoteListByCollectionUserId
-    const res = await api(userId.value, page.value, pageSize)
-    const newData = Array.isArray(res) ? res : []
-
-    // 适配 PostCard 数据结构
-    const formattedData = newData.map(item => ({
-      ...item,
-      image: getImageUrl(item.image, 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书'),
-      likes: item.like || 0, // 映射 like 到 likes
-      // 确保 PostCard 需要的字段存在
-      author: {
-        name: item.user?.nickname || userInfo.value.nickname || '用户',
-        avatar: getImageUrl(item.user?.image || userInfo.value.image, defaultAvatar),
-        id: item.user?.id || item.userId || userId.value
+    if (currentTab.value === 'products') {
+      if (!shopInfo.value) {
+        listLoading.value = false
+        return
       }
-    }))
-
-    if (currentTab.value === 'notes') {
-      notesList.value = isLoadMore ? [...notesList.value, ...formattedData] : formattedData
+      if (!isLoadMore) {
+        const res = await getProductsByShop(shopInfo.value.id)
+        productsList.value = res || []
+        hasMore.value = false
+      }
     } else {
-      collectionList.value = isLoadMore ? [...collectionList.value, ...formattedData] : formattedData
-    }
+      const api = currentTab.value === 'notes' ? getNoteListByUserId : getNoteListByCollectionUserId
+      const res = await api(userId.value, page.value, pageSize)
+      const newData = Array.isArray(res) ? res : []
 
-    hasMore.value = newData.length === pageSize
+      // 适配 PostCard 数据结构
+      const formattedData = newData.map(item => ({
+        ...item,
+        image: getImageUrl(item.image, 'https://via.placeholder.com/300x400/f0f0f0/999999?text=小红书'),
+        likes: item.like || 0, // 映射 like 到 likes
+        // 确保 PostCard 需要的字段存在
+        author: {
+          name: item.user?.nickname || userInfo.value.nickname || '用户',
+          avatar: getImageUrl(item.user?.image || userInfo.value.image, defaultAvatar),
+          id: item.user?.id || item.userId || userId.value
+        }
+      }))
+
+      if (currentTab.value === 'notes') {
+        notesList.value = isLoadMore ? [...notesList.value, ...formattedData] : formattedData
+      } else {
+        collectionList.value = isLoadMore ? [...collectionList.value, ...formattedData] : formattedData
+      }
+
+      hasMore.value = newData.length === pageSize
+    }
   } catch (err) {
     console.error('Load list failed', err)
   } finally {
@@ -377,11 +458,13 @@ const switchTab = (tab) => {
   currentTab.value = tab
   page.value = 1
   hasMore.value = true
-  // 如果目标列表为空，则加载
-  if ((tab === 'notes' && notesList.value.length === 0) ||
-      (tab === 'collection' && collectionList.value.length === 0)) {
-    loadList()
-  }
+  
+  // 清空当前列表数据，触发重新加载
+  if (tab === 'notes') notesList.value = []
+  else if (tab === 'collection') collectionList.value = []
+  else if (tab === 'products') productsList.value = []
+  
+  loadList()
 }
 
 // 加载更多
@@ -776,5 +859,69 @@ watch(() => route.params.id, (newId) => {
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 20px auto;
+}
+/* 商品卡片样式 */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.product-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.image-wrapper {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #f9f9f9;
+}
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-info {
+  padding: 8px;
+}
+
+.product-title {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+  height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin-bottom: 6px;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.price {
+  color: #ff2442;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.symbol {
+  font-size: 12px;
+}
+
+.sales {
+  font-size: 11px;
+  color: #999;
 }
 </style>

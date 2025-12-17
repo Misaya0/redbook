@@ -13,6 +13,10 @@ import LikeCollect from '@/views/Message/LikeCollect.vue'
 import NewFollow from '@/views/Message/NewFollow.vue'
 import CommentAt from '@/views/Message/CommentAt.vue'
 import ProductList from '@/views/Product/ProductList.vue'
+import ProductDetail from '@/views/Product/ProductDetail.vue'
+import ProductManage from '@/views/Merchant/ProductManage.vue'
+import MerchantProfile from '@/views/Merchant/MerchantProfile.vue'
+import ProductPublish from '@/views/Merchant/ProductPublish.vue'
 import OrderList from '@/views/Order/OrderList.vue'
 import NoteDetail from '@/views/NoteDetail.vue'
 
@@ -31,6 +35,29 @@ const routes = [
     path: '/products',
     name: 'ProductList',
     component: ProductList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/product/:id',
+    name: 'ProductDetail',
+    component: ProductDetail
+  },
+  {
+    path: '/merchant/products',
+    name: 'ProductManage',
+    component: ProductManage,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/merchant/profile',
+    name: 'MerchantProfile',
+    component: MerchantProfile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/merchant/publish',
+    name: 'ProductPublish',
+    component: ProductPublish,
     meta: { requiresAuth: true }
   },
   {

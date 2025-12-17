@@ -201,8 +201,20 @@ const handleLogin = async () => {
     if (result.success) {
       await showAlert(result.message, '欢迎')
       resetForm()
-      // 返回首页
-      router.push('/')
+      
+      // 登录成功后跳转逻辑
+      if (result.role === 1) {
+        // 商家用户跳转到商家后台
+        router.push('/merchant/products')
+      } else {
+        // 普通用户跳转到首页或之前页面
+        const redirect = router.currentRoute.value.query.redirect
+        if (redirect) {
+          router.push(redirect)
+        } else {
+          router.push('/')
+        }
+      }
     } else {
       if (!result.isHandled) {
         await showAlert(result.message, '登录失败')

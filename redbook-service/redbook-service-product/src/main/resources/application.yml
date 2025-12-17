@@ -25,14 +25,27 @@ spring:
           max-idle: 8
           min-idle: 0
     mongodb:
-      host: 10.1.40.66
-      port: 27017
-      database: redbook
+#      host: 10.1.40.66
+#      port: 27017
+#      database: redbook
+#      username: admin
+#      password: 123321
+#      authentication-database: admin
+      uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - [traceId=%X{traceId}] [req=%X{req}] [uid=%X{uid}] %msg%n"
+  level:
+    com.baomidou.mybatisplus: DEBUG
+    org.apache.ibatis: DEBUG
+    # 你的 mapper 包路径也可以加上，确保能看到
+    com.itcast: DEBUG
+    com.itcast.mapper: DEBUG
 

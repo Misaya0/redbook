@@ -92,12 +92,13 @@ spring:
         min-idle: 0
   data:
     mongodb:
-      host: 10.1.40.66
-      port: 27017
-      database: redbook
-#      username: root
-#      password: root
+#      host: 10.1.40.66
+#      port: 27017
+#      database: redbook
+#      username: admin
+#      password: 123321
 #      authentication-database: admin
+      uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
   elasticsearch:
     uris: http://10.1.40.66:9200
 oss:

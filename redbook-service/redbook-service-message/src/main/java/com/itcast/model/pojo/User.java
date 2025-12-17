@@ -63,4 +63,8 @@ public class User implements Serializable {
      * 注册时间
      */
     private String time;
+    /**
+     * 角色: 0-普通, 1-商家
+     */
+    private Integer role;
 }

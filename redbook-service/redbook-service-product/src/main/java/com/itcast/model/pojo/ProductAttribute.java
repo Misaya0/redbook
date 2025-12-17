@@ -17,7 +17,7 @@ public class ProductAttribute {
     /**
      * 属性对应的商品id
      */
-    private Integer product_id;
+    private Long product_id;
 
     /**
      * 自定义属性
