@@ -114,10 +114,10 @@
                 <input v-model="sku.name" placeholder="规格名称 (如: 红色 L码)" class="form-input sku-name" />
                 <input v-model.number="sku.price" type="number" placeholder="价格" class="form-input sku-price" />
                 <input v-model.number="sku.stock" type="number" placeholder="库存" class="form-input sku-stock" />
-                <button class="remove-sku-btn" @click="removeSku(index)" v-if="form.skus.length > 1">删除</button>
+                <button type="button" class="remove-sku-btn" @click="removeSku(index)" v-if="form.skus.length > 1">删除</button>
               </div>
             </div>
-            <button class="add-sku-btn" @click="addSku">+ 添加规格</button>
+            <button type="button" class="add-sku-btn" @click="addSku">+ 添加规格</button>
           </div>
         </div>
 
@@ -185,6 +185,21 @@ const canPublish = computed(() => {
     form.skus.every(sku => sku.price > 0 && sku.stock >= 0)
   )
 })
+
+const addSku = () => {
+  form.skus.push({
+    name: '',
+    price: '',
+    stock: '',
+    image: form.mainImage || '',
+    specs: '{}'
+  })
+}
+
+const removeSku = (index) => {
+  if (form.skus.length <= 1) return
+  form.skus.splice(index, 1)
+}
 
 // 分类联动逻辑
 const handleCategory1Change = async () => {
@@ -595,6 +610,10 @@ onMounted(() => {
   cursor: pointer;
 }
 
+.remove-sku-btn:active {
+  background: rgba(255, 36, 66, 0.08);
+}
+
 .add-sku-btn {
   width: 100%;
   padding: 10px;
@@ -609,6 +628,10 @@ onMounted(() => {
 .add-sku-btn:hover {
   border-color: #ff2442;
   color: #ff2442;
+}
+
+.add-sku-btn:active {
+  background: rgba(255, 36, 66, 0.06);
 }
 
 /* 图片上传样式 */
