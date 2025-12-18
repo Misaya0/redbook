@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,9 +39,19 @@ import java.util.ArrayList;
 
 import com.itcast.mapper.CategoryMapper;
 
+import com.itcast.constant.MqConstant;
+import com.itcast.model.dto.ProductEsDTO;
+import com.itcast.model.dto.ProductSyncMessage;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
 @Service
 @Slf4j
 public class ProductServiceImpl implements ProductService {
+
+    private static final DateTimeFormatter PRODUCT_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     @Autowired
     private ProductMapper productMapper;
@@ -74,6 +85,21 @@ public class ProductServiceImpl implements ProductService {
         Page<Product> page = new Page<>(pageNum == null ? 1 : pageNum, pageSize == null ? 10 : pageSize);
         Page<Product> productPage = productMapper.selectPage(page, null);
         return Result.success(productPage.getRecords());
+    }
+
+    @Override
+    public Result<List<ProductEsDTO>> getProductEsList(Integer pageNum, Integer pageSize) {
+        int finalPageNum = pageNum == null ? 1 : pageNum;
+        int finalPageSize = pageSize == null ? 100 : pageSize;
+        Page<Product> page = new Page<>(finalPageNum, finalPageSize);
+        Page<Product> productPage = productMapper.selectPage(page, null);
+        List<Product> products = productPage.getRecords();
+        if (products == null || products.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+
+        List<ProductEsDTO> list = products.stream().map(this::buildProductEsDTO).collect(Collectors.toList());
+        return Result.success(list);
     }
 
     @Override
@@ -168,6 +194,65 @@ public class ProductServiceImpl implements ProductService {
         return Result.success(products);
     }
 
+    // 辅助方法：发送同步消息
+    private void sendProductSyncMessage(Product product, String type) {
+        try {
+            ProductSyncMessage message = new ProductSyncMessage();
+            message.setType(type);
+            message.setId(product.getId());
+            
+            if ("save".equals(type)) {
+                Product productForBuild = product;
+                if (productForBuild.getName() == null || productForBuild.getShopId() == null) {
+                    Product dbProduct = productMapper.selectById(product.getId());
+                    if (dbProduct != null) {
+                        productForBuild = dbProduct;
+                    }
+                }
+                ProductEsDTO dto = buildProductEsDTO(productForBuild);
+                message.setData(dto);
+            }
+            
+            rabbitTemplate.convertAndSend(MqConstant.PRODUCT_ES_EXCHANGE, MqConstant.PRODUCT_ES_SYNC_KEY, objectMapper.writeValueAsString(message));
+            log.info("Sent product sync message: type={}, id={}", type, product.getId());
+        } catch (Exception e) {
+            log.error("Failed to send product sync message", e);
+        }
+    }
+
+    private ProductEsDTO buildProductEsDTO(Product product) {
+        ProductEsDTO dto = new ProductEsDTO();
+        BeanUtils.copyProperties(product, dto);
+        dto.setImage(product.getMainImage());
+
+        Integer stock = 0;
+        if (product.getId() != null) {
+            List<Sku> skus = skuMapper.selectList(new LambdaQueryWrapper<Sku>().eq(Sku::getProductId, product.getId()));
+            if (skus != null && !skus.isEmpty()) {
+                stock = skus.stream().map(Sku::getStock).filter(s -> s != null).reduce(0, Integer::sum);
+                List<BigDecimal> prices = skus.stream().map(Sku::getPrice).filter(p -> p != null).collect(Collectors.toList());
+                if (!prices.isEmpty()) {
+                    BigDecimal min = prices.stream().min(BigDecimal::compareTo).orElse(null);
+                    if (min != null) {
+                        dto.setPrice(min.doubleValue());
+                    }
+                }
+            }
+        }
+        dto.setStock(stock);
+
+        if (dto.getSales() == null) {
+            dto.setSales(0);
+        }
+        LocalDateTime createTime = product.getCreateTime();
+        if (createTime == null) {
+            createTime = LocalDateTime.now();
+        }
+        dto.setCreateTime(createTime.format(PRODUCT_TIME_FORMATTER));
+
+        return dto;
+    }
+
     @Override
     @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<Void> postProduct(ProductDto productDto) {
@@ -198,7 +283,8 @@ public class ProductServiceImpl implements ProductService {
             }
         }
         
-        // 4. 发送 MQ 消息通知 Search 服务 (可选)
+        // 4. 发送 MQ 消息通知 Search 服务 (可选) -> 现在实现了
+        sendProductSyncMessage(product, "save");
         
         return Result.success(null);
     }
@@ -269,12 +355,21 @@ public class ProductServiceImpl implements ProductService {
         String cacheKey = "product:detail:" + product.getId();
         stringRedisTemplate.delete(cacheKey);
 
+        // 4. 同步到 ES
+        sendProductSyncMessage(product, "save");
+
         return Result.success(null);
     }
 
     @Override
     public Result<Void> deleteProduct(Integer productId) {
         productMapper.deleteById(productId);
+        
+        // 同步删除 ES
+        Product product = new Product();
+        product.setId(Long.valueOf(productId));
+        sendProductSyncMessage(product, "delete");
+        
         return Result.success(null);
     }
 

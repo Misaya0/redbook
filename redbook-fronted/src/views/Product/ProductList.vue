@@ -80,10 +80,10 @@
             @click="navigateToDetail(product.id)"
         >
           <div class="image-wrapper">
-            <img :src="getImageUrl(product.mainImage)" class="product-image" loading="lazy"/>
+            <img :src="getImageUrl(product.mainImage || product.image)" class="product-image" loading="lazy"/>
           </div>
           <div class="product-info">
-            <h3 class="product-title">{{ product.name }}</h3>
+            <h3 class="product-title" v-html="product.name"></h3>
             <div class="tags" v-if="product.tags">
               <span v-for="tag in product.tags" :key="tag" class="tag">{{ tag }}</span>
             </div>

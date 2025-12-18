@@ -1,6 +1,7 @@
 package com.itcast.controller;
 
 import com.itcast.model.dto.ProductDto;
+import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
 import com.itcast.model.vo.ProductVo;
@@ -31,6 +32,14 @@ public class ProductController {
             @Parameter(description = "页码") @RequestParam(required = false, defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页大小") @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
         return productService.getProductList(pageNum, pageSize);
+    }
+
+    @Operation(summary = "获取商品ES同步列表", description = "用于全量同步到ES的商品列表")
+    @GetMapping("/getProductEsList")
+    public Result<List<ProductEsDTO>> getProductEsList(
+            @Parameter(description = "页码") @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @Parameter(description = "每页大小") @RequestParam(required = false, defaultValue = "100") Integer pageSize) {
+        return productService.getProductEsList(pageNum, pageSize);
     }
 
     @Operation(summary = "获取商品详情", description = "根据商品ID获取商品详细信息")

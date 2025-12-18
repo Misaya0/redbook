@@ -43,4 +43,16 @@ public class SearchController {
             @Parameter(description = "关键词") @RequestParam String keyword) throws IOException {
         return searchService.suggest(keyword);
     }
+
+    @Operation(summary = "搜索商品 (ES)", description = "商品专用高级搜索")
+    @PostMapping("/product")
+    public Result<Object> searchProduct(@RequestBody com.itcast.model.dto.ProductSearchDto searchDto) throws IOException {
+        return searchService.searchProduct(searchDto);
+    }
+
+    @Operation(summary = "全量同步商品到ES", description = "将商品服务的MySQL商品全量写入 rb_product")
+    @PostMapping("/product/syncAll")
+    public Result<Void> syncAllProductsToEs() throws IOException {
+        return searchService.syncAllProductsToEs();
+    }
 }

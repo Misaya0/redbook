@@ -12,4 +12,8 @@ public interface SearchService {
     Result<Object> searchAll(String keyword, Integer type, Integer page, Integer size) throws IOException;
 
     Result<List<String>> suggest(String keyword) throws IOException;
+
+    Result<Object> searchProduct(com.itcast.model.dto.ProductSearchDto searchDto) throws IOException;
+
+    Result<Void> syncAllProductsToEs() throws IOException;
 }

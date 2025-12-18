@@ -18,4 +18,9 @@ public class MqConstant {
     public static final String NOTE_ES_EXCHANGE = "note.es.exchange";
     public static final String NOTE_ES_SYNC_QUEUE = "note.es.sync.queue";
     public static final String NOTE_ES_SYNC_KEY = "note.es.sync.key";
+
+    // Product ES Sync
+    public static final String PRODUCT_ES_EXCHANGE = "product.es.exchange";
+    public static final String PRODUCT_ES_SYNC_QUEUE = "product.es.sync.queue";
+    public static final String PRODUCT_ES_SYNC_KEY = "product.es.sync.key";
 }

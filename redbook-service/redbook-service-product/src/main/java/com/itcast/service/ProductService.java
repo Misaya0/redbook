@@ -1,6 +1,7 @@
 package com.itcast.service;
 
 import com.itcast.model.dto.ProductDto;
+import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
 import com.itcast.model.vo.ProductVo;
@@ -14,6 +15,8 @@ import com.itcast.model.pojo.Category;
 
 public interface ProductService {
     Result<List<Product>> getProductList(Integer pageNum, Integer pageSize);
+
+    Result<List<ProductEsDTO>> getProductEsList(Integer pageNum, Integer pageSize);
 
     Result<ProductVo> getProduct(Integer productId);
 

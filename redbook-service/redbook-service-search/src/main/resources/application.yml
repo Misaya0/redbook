@@ -24,6 +24,12 @@ spring:
         max-active: 8
         max-idle: 8
         min-idle: 0
+  rabbitmq:
+    host: 10.1.40.66
+    port: 5672
+    username: admin
+    password: 123321
+    virtual-host: /
   elasticsearch:
     uris: http://10.1.40.66:9200
 mybatis-plus:

@@ -1,23 +1,33 @@
 package com.itcast;
 
-import com.itcast.constant.RedisConstant;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itcast.client.ProductClient;
+import com.itcast.model.dto.ProductEsDTO;
+import com.itcast.result.Result;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.core.RedisTemplate;
 
-import java.util.Set;
+import java.io.IOException;
+import java.util.List;
 
-@SpringBootTest
+@SpringBootTest(classes = RedbookServiceSearchApplication.class)
 class RedbookServiceSearchApplicationTests {
 
     @Autowired
-    private RedisTemplate redisTemplate;
+    private RestHighLevelClient client;
 
-    @Test
-    void testRedis() {
-        Set<Object> hots = redisTemplate.opsForZSet().reverseRange(RedisConstant.NOTE_SCORE, 0, 9);
+    @Autowired
+    private ProductClient productClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     }
-
-
 }

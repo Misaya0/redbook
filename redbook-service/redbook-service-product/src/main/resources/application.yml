@@ -25,13 +25,27 @@ spring:
           max-idle: 8
           min-idle: 0
     mongodb:
-#      host: 10.1.40.66
-#      port: 27017
-#      database: redbook
-#      username: admin
-#      password: 123321
-#      authentication-database: admin
+    #      host: 10.1.40.66
+    #      port: 27017
+    #      database: redbook
+    #      username: admin
+    #      password: 123321
+    #      authentication-database: admin
       uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
+  rabbitmq:
+    host: 10.1.40.66
+    port: 5672
+    username: admin
+    password: 123321
+    virtual-host: /
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-interval: 10000ms
+          multiplier: 2
+          max-attempts: 3
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
