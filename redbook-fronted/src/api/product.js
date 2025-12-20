@@ -24,6 +24,14 @@ export const getProductDetail = (productId) => {
   return request.get(`/product/getProduct/${productId}`)
 }
 
+export const getProductSpecs = (productId, config = {}) => {
+  return request.get(`/product/getProductSpecs/${productId}`, config)
+}
+
+export const getCategorySpecs = (categoryId, config = {}) => {
+  return request.get(`/product/getCategorySpecs/${categoryId}`, config)
+}
+
 /**
  * 按店铺获取商品
  * @param {number} shopId - 店铺ID

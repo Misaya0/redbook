@@ -1,5 +1,5 @@
 <template>
-  <div class="product-manage-container">
+  <div class="product-manage-container" ref="containerRef">
     <div class="header">
       <h2>商家中心 - 商品管理</h2>
       <el-button type="primary" @click="handleAdd">发布新商品</el-button>
@@ -9,34 +9,43 @@
     <div class="search-bar">
       <el-form :inline="true" :model="searchForm" @submit.prevent="handleSearch">
         <el-form-item label="商品名称">
-          <el-input v-model="searchForm.keyword" placeholder="请输入关键词" clearable />
+          <el-input v-model="searchForm.keyword" placeholder="请输入关键词" clearable/>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" native-type="submit" @click="handleSearch">查询</el-button>
-          <el-button @click="resetSearch">重置</el-button>
+          <el-button type="primary" native-type="submit" @click="handleSearch" :loading="loading">查询</el-button>
+          <el-button @click="resetSearch" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
 
     <!-- 商品列表表格 -->
-    <el-table :data="tableData" border style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="80" />
+    <el-table
+        :data="tableData"
+        border
+        style="width: 100%"
+        v-loading="loading"
+        element-loading-text="加载中..."
+    >
+      <template #empty>
+        <el-empty description="暂无商品"/>
+      </template>
+      <el-table-column prop="id" label="ID" width="80"/>
       <el-table-column label="商品图片" width="100">
         <template #default="scope">
-          <el-image 
-            :src="getImageUrl(scope.row.mainImage)" 
-            style="width: 60px; height: 60px; border-radius: 4px;" 
-            fit="cover" 
+          <el-image
+              :src="getImageUrl(scope.row.mainImage)"
+              style="width: 60px; height: 60px; border-radius: 4px;"
+              fit="cover"
           />
         </template>
       </el-table-column>
-      <el-table-column prop="name" label="商品名称" min-width="200" show-overflow-tooltip />
+      <el-table-column prop="name" label="商品名称" min-width="200" show-overflow-tooltip/>
       <el-table-column label="价格" width="120">
         <template #default="scope">
           <span style="color: #ff2442; font-weight: bold;">¥{{ scope.row.price }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="totalStock" label="总库存" width="100" />
+      <el-table-column prop="totalStock" label="总库存" width="100"/>
       <el-table-column label="状态" width="100">
         <template #default="scope">
           <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
@@ -55,49 +64,56 @@
 
     <!-- 分页 -->
     <div class="pagination-container">
+      <div class="page-count" v-if="total > 0">共 {{ pageCount }} 页</div>
       <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
+          :current-page="currentPage"
+          :page-size="pageSize"
           :page-sizes="[10, 20, 50]"
-          layout="total, prev, pager, next"
+          layout="total,sizes,prev,pager,next,jumper"
           :total="total"
+          prev-text="上一页"
+          next-text="下一页"
+          :disabled="loading"
+          background
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
       />
     </div>
 
     <!-- SKU管理弹窗 -->
     <el-dialog
-      v-model="skuDialogVisible"
-      title="SKU库存管理"
-      width="700px"
+        v-model="skuDialogVisible"
+        title="SKU库存管理"
+        width="700px"
     >
       <div v-loading="skuLoading">
         <div class="sku-header" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
           <el-button type="primary" size="small" @click="addSkuItem">添加规格</el-button>
         </div>
-        
+
         <el-table :data="skuList" border style="width: 100%">
           <el-table-column label="规格名称" min-width="150">
             <template #default="{ row }">
-              <el-input v-model="row.name" placeholder="如: 红色 L码" />
+              <el-input v-model="row.name" placeholder="如: 红色 L码"/>
             </template>
           </el-table-column>
           <el-table-column label="价格" width="120">
             <template #default="{ row }">
-              <el-input-number v-model="row.price" :min="0" :precision="2" :controls="false" style="width: 100%" />
+              <el-input-number v-model="row.price" :min="0" :precision="2" :controls="false" style="width: 100%"/>
             </template>
           </el-table-column>
           <el-table-column label="库存" width="120">
             <template #default="{ row }">
-              <el-input-number v-model="row.stock" :min="0" :controls="false" style="width: 100%" />
+              <el-input-number v-model="row.stock" :min="0" :controls="false" style="width: 100%"/>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ $index }">
-              <el-button 
-                type="danger" 
-                link 
-                @click="removeSkuItem($index)" 
-                :disabled="skuList.length <= 1"
+              <el-button
+                  type="danger"
+                  link
+                  @click="removeSkuItem($index)"
+                  :disabled="skuList.length <= 1"
               >
                 删除
               </el-button>
@@ -115,13 +131,14 @@
   </div>
 </template>
 
+
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { searchProductMySql, deleteProduct, getProductDetail, updateProduct } from '@/api/product'
-import { getMyShop } from '@/api/shop'
-import { getImageUrl } from '@/utils/image'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {ref, reactive, onMounted, watch, computed, nextTick} from 'vue'
+import {useRouter} from 'vue-router'
+import {searchProductMySql, deleteProduct, getProductDetail, updateProduct} from '@/api/product'
+import {getMyShop} from '@/api/shop'
+import {getImageUrl} from '@/utils/image'
+import {ElMessage, ElMessageBox} from 'element-plus'
 
 const router = useRouter()
 
@@ -134,6 +151,12 @@ const tableData = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const pageCount = computed(() => {
+  const size = Number(pageSize.value) || 10
+  const t = Number(total.value) || 0
+  return Math.max(1, Math.ceil(t / size))
+})
+const containerRef = ref(null)
 const shopId = ref(null) // 当前商家店铺ID
 const searchForm = reactive({
   keyword: ''
@@ -163,18 +186,27 @@ const init = async () => {
 // 监听店铺ID变化，一旦获取到ID自动加载商品
 watch(shopId, (val) => {
   if (val) {
+    currentPage.value = 1
     fetchList()
   }
 })
-watch(currentPage, (val, oldVal) => {
-  if (val !== oldVal) fetchList()
-})
+
+const scrollToTop = async () => {
+  await nextTick()
+  const el = containerRef.value
+  if (el && typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({behavior: 'smooth', block: 'start'})
+    return
+  }
+  if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+    window.scrollTo({top: 0, behavior: 'smooth'})
+  }
+}
 
 const fetchList = async () => {
-  console.trace('[fetchList called]')
   if (!shopId.value) return
   if (loading.value) return // 防止重复请求
-  
+
   loading.value = true
   try {
     const res = await searchProductMySql({
@@ -183,21 +215,21 @@ const fetchList = async () => {
       pageSize: pageSize.value,
       shopId: shopId.value
     })
-    
+
     let list = []
     if (res && res.list) {
       list = res.list
-      total.value = res.total
+      total.value = Number(res.total || 0)
     } else if (res && res.records) {
       list = res.records
-      total.value = res.total
+      total.value = Number(res.total || 0)
     } else if (Array.isArray(res)) {
       list = res
       total.value = res.length
     }
-    
+
     tableData.value = list
-    
+
   } catch (err) {
     console.error(err)
     ElMessage.error('获取列表失败')
@@ -208,6 +240,7 @@ const fetchList = async () => {
 
 const handleSearch = () => {
   currentPage.value = 1
+  scrollToTop()
   fetchList()
 }
 
@@ -217,7 +250,15 @@ const resetSearch = () => {
 }
 
 const handleCurrentChange = (val) => {
-  // currentPage 已通过 v-model 更新
+  currentPage.value = val
+  scrollToTop()
+  fetchList()
+}
+
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  currentPage.value = 1
+  scrollToTop()
   fetchList()
 }
 
@@ -226,7 +267,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  router.push({ path: '/merchant/publish', query: { id: row.id } })
+  router.push({path: '/merchant/publish', query: {id: row.id}})
 }
 
 const handleDelete = (row) => {
@@ -249,7 +290,7 @@ const handleSku = async (row) => {
   currentProduct.value = row
   skuLoading.value = true
   skuDialogVisible.value = true
-  
+
   try {
     const res = await getProductDetail(row.id)
     if (res && res.skus) {
@@ -277,7 +318,7 @@ const handleSku = async (row) => {
 
 const saveSkus = async () => {
   if (!currentProduct.value) return
-  
+
   // 简单校验
   if (skuList.value.some(s => !s.name || s.price < 0 || s.stock < 0)) {
     ElMessage.warning('请完善SKU信息，价格和库存不能为负数')
@@ -291,7 +332,7 @@ const saveSkus = async () => {
       ...currentProduct.value,
       skus: skuList.value
     }
-    
+
     // 解决后端反序列化报错：Cannot construct instance of `org.bson.types.ObjectId`
     // 前端 currentProduct 可能包含 productAttribute，但 id 格式不符合 ObjectId 要求
     // 且 updateProduct 接口目前只更新 SPU 和 SKU，不更新 MongoDB 中的属性，故直接移除
@@ -301,7 +342,7 @@ const saveSkus = async () => {
     if ('shop' in payload) delete payload.shop
     if ('relatedNotes' in payload) delete payload.relatedNotes
     if ('totalStock' in payload) delete payload.totalStock
-    
+
     await updateProduct(payload)
     ElMessage.success('SKU更新成功')
     skuDialogVisible.value = false
@@ -355,6 +396,31 @@ const removeSkuItem = (index) => {
 .pagination-container {
   margin-top: 20px;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-count {
+  color: #666;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .header {
+    gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagination-container {
+    justify-content: center;
+  }
+
+  .page-count {
+    text-align: left;
+  }
 }
 </style>

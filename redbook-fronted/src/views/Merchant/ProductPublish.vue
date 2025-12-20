@@ -108,6 +108,59 @@
           <label class="form-label">
             商品规格 (SKU)
           </label>
+
+          <div v-if="form.categoryId" class="spec-schema">
+            <div class="spec-mode-toggle">
+              <button
+                type="button"
+                class="spec-mode-btn"
+                :class="{ active: specMode === 'schema' }"
+                @click="specMode = 'schema'"
+              >
+                规格组合
+              </button>
+              <button
+                type="button"
+                class="spec-mode-btn"
+                :class="{ active: specMode === 'manual' }"
+                @click="specMode = 'manual'"
+              >
+                手动SKU
+              </button>
+            </div>
+
+            <div v-if="specMode === 'schema'">
+              <div v-if="categorySpecGroups.length === 0" class="sku-spec-summary">该品类暂未配置规格Schema，可使用手动SKU</div>
+              <template v-else>
+                <div v-for="group in categorySpecGroups" :key="group.key" class="spec-group">
+                  <div class="spec-title">{{ group.title }}</div>
+                  <div class="spec-options">
+                    <label v-for="opt in group.options" :key="opt.value" class="spec-option">
+                      <input type="checkbox" :value="opt.value" v-model="selectedSpecValues[group.key]" />
+                      <span>{{ opt.label }}</span>
+                    </label>
+                  </div>
+                  <div class="spec-custom">
+                    <input
+                      v-model="customOptionInputs[group.key]"
+                      type="text"
+                      class="form-input spec-custom-input"
+                      placeholder="输入自定义选项值"
+                      @keyup.enter="addCustomOption(group.key)"
+                    />
+                    <button type="button" class="spec-custom-btn" @click="addCustomOption(group.key)">添加</button>
+                  </div>
+                </div>
+
+                <div class="spec-actions">
+                  <button type="button" class="add-sku-btn" @click="generateSkus" :disabled="!canGenerateSkus">
+                    生成SKU组合
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+
           <div class="sku-manager">
             <div v-for="(sku, index) in form.skus" :key="index" class="sku-item">
               <div class="sku-row">
@@ -116,8 +169,19 @@
                 <input v-model.number="sku.stock" type="number" placeholder="库存" class="form-input sku-stock" />
                 <button type="button" class="remove-sku-btn" @click="removeSku(index)" v-if="form.skus.length > 1">删除</button>
               </div>
+              <div v-if="sku.specsMap && Object.keys(sku.specsMap).length > 0" class="sku-spec-summary">
+                {{ formatSkuSpecsSummary(sku.specsMap) }}
+              </div>
             </div>
-            <button type="button" class="add-sku-btn" @click="addSku">+ 添加规格</button>
+
+            <button
+              v-if="specMode === 'manual'"
+              type="button"
+              class="add-sku-btn"
+              @click="addSku"
+            >
+              + 添加规格
+            </button>
           </div>
         </div>
 
@@ -139,9 +203,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { postProduct, updateProduct, getProductDetail, getCategoryList } from '@/api/product'
+import { postProduct, updateProduct, getProductDetail, getCategoryList, getCategorySpecs } from '@/api/product'
 import { getMyShop } from '@/api/shop'
 import { uploadFile } from '@/api/common'
 import { getImageUrl } from '@/utils/image'
@@ -160,6 +224,11 @@ const categoryList2 = ref([]) // 二级分类
 const selectedCategory1 = ref(null) // 选中一级分类
 const loadingCategory2 = ref(false)
 
+const categorySpecGroups = ref([])
+const specMode = ref('manual')
+const selectedSpecValues = reactive({})
+const customOptionInputs = reactive({})
+
 const form = reactive({
   id: null,
   name: '',
@@ -171,7 +240,7 @@ const form = reactive({
   shopId: null,
   categoryId: '',
   skus: [
-    { name: '', price: '', stock: '', image: '', specs: '{}' }
+    { name: '', price: '', stock: '', image: '', specs: '{}', specsMap: {} }
   ]
 })
 
@@ -192,13 +261,139 @@ const addSku = () => {
     price: '',
     stock: '',
     image: form.mainImage || '',
-    specs: '{}'
+    specs: '{}',
+    specsMap: {}
   })
 }
 
 const removeSku = (index) => {
   if (form.skus.length <= 1) return
   form.skus.splice(index, 1)
+}
+
+const canGenerateSkus = computed(() => {
+  if (!categorySpecGroups.value || categorySpecGroups.value.length === 0) return false
+  const groups = categorySpecGroups.value
+  const selectedGroups = groups.filter((g) => {
+    const values = selectedSpecValues[g.key]
+    return Array.isArray(values) && values.length > 0
+  })
+  return selectedGroups.length > 0
+})
+
+const formatSkuSpecsSummary = (specsMap) => {
+  if (!specsMap) return ''
+  const parts = Object.entries(specsMap)
+    .filter(([k, v]) => k && v != null && String(v).trim() !== '')
+    .map(([k, v]) => `${k}:${v}`)
+  return parts.join('，')
+}
+
+const parseSpecsString = (specs) => {
+  if (specs == null) return {}
+  if (typeof specs === 'object') {
+    if (Array.isArray(specs)) return {}
+    return specs
+  }
+  const text = String(specs).trim()
+  if (!text) return {}
+  try {
+    const obj = JSON.parse(text)
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {}
+    return obj
+  } catch (e) {
+    return {}
+  }
+}
+
+const resetSpecStateByGroups = (groups) => {
+  const keys = (groups || []).map((g) => g.key)
+  Object.keys(selectedSpecValues).forEach((k) => {
+    if (!keys.includes(k)) delete selectedSpecValues[k]
+  })
+  Object.keys(customOptionInputs).forEach((k) => {
+    if (!keys.includes(k)) delete customOptionInputs[k]
+  })
+  keys.forEach((k) => {
+    if (!Array.isArray(selectedSpecValues[k])) selectedSpecValues[k] = []
+    if (customOptionInputs[k] == null) customOptionInputs[k] = ''
+  })
+}
+
+const addCustomOption = (groupKey) => {
+  const raw = customOptionInputs[groupKey]
+  const value = raw == null ? '' : String(raw).trim()
+  if (!value) return
+  const group = categorySpecGroups.value.find((g) => g.key === groupKey)
+  if (!group) return
+  if (!Array.isArray(group.options)) group.options = []
+  const exists = group.options.some((o) => String(o.value) === value)
+  if (!exists) {
+    group.options.push({ value, label: value })
+  }
+  if (!Array.isArray(selectedSpecValues[groupKey])) selectedSpecValues[groupKey] = []
+  if (!selectedSpecValues[groupKey].includes(value)) selectedSpecValues[groupKey].push(value)
+  customOptionInputs[groupKey] = ''
+}
+
+const cartesianProduct = (lists) => {
+  if (!lists || lists.length === 0) return [[]]
+  return lists.reduce((acc, curr) => {
+    const next = []
+    acc.forEach((a) => {
+      curr.forEach((b) => {
+        next.push([...a, b])
+      })
+    })
+    return next
+  }, [[]])
+}
+
+const getOptionLabel = (group, value) => {
+  if (!group || !Array.isArray(group.options)) return String(value)
+  const found = group.options.find((o) => String(o.value) === String(value))
+  return found ? found.label : String(value)
+}
+
+const generateSkus = () => {
+  if (!canGenerateSkus.value) return
+
+  const groups = categorySpecGroups.value.filter((g) => {
+    const values = selectedSpecValues[g.key]
+    return Array.isArray(values) && values.length > 0
+  })
+  if (!groups || groups.length === 0) {
+    ElMessage.warning('请至少选择一个规格组选项')
+    return
+  }
+  const keys = groups.map((g) => g.key)
+  const valuesList = keys.map((k) => selectedSpecValues[k].map((v) => String(v)))
+  const combos = cartesianProduct(valuesList)
+  const maxCombos = 500
+  if (combos.length > maxCombos) {
+    ElMessage.error(`SKU组合过多(>${maxCombos})，请减少选项再生成`)
+    return
+  }
+
+  const basePrice = form.skus && form.skus[0] ? form.skus[0].price : ''
+  const baseStock = form.skus && form.skus[0] ? form.skus[0].stock : ''
+
+  form.skus = combos.map((combo) => {
+    const specsMap = {}
+    combo.forEach((v, idx) => {
+      specsMap[keys[idx]] = v
+    })
+    const nameParts = combo.map((v, idx) => getOptionLabel(groups[idx], v))
+    const name = nameParts.join(' / ')
+    return {
+      name,
+      price: basePrice,
+      stock: baseStock,
+      image: form.mainImage || '',
+      specsMap,
+      specs: JSON.stringify(specsMap)
+    }
+  })
 }
 
 // 分类联动逻辑
@@ -218,6 +413,34 @@ const handleCategory1Change = async () => {
     loadingCategory2.value = false
   }
 }
+
+const loadCategorySpecs = async (categoryId) => {
+  if (!categoryId) {
+    categorySpecGroups.value = []
+    return
+  }
+  try {
+    const res = await getCategorySpecs(categoryId)
+    categorySpecGroups.value = res || []
+    resetSpecStateByGroups(categorySpecGroups.value)
+    if (categorySpecGroups.value.length > 0) {
+      const canAutoSwitch = !form.skus || form.skus.length === 0 || (form.skus.length === 1 && !form.skus[0].name)
+      if (canAutoSwitch) specMode.value = 'schema'
+    } else if (specMode.value === 'schema') {
+      specMode.value = 'manual'
+    }
+  } catch (e) {
+    categorySpecGroups.value = []
+    if (specMode.value === 'schema') specMode.value = 'manual'
+  }
+}
+
+watch(
+  () => form.categoryId,
+  async (val) => {
+    await loadCategorySpecs(val)
+  }
+)
 
 // 初始化
 const init = async () => {
@@ -271,11 +494,16 @@ const loadProduct = async (id) => {
       
       // 特殊处理 skus，确保格式正确
       if (res.skus) {
-        form.skus = res.skus.map(s => ({
-          ...s,
-          price: Number(s.price),
-          stock: Number(s.stock)
-        }))
+        form.skus = res.skus.map(s => {
+          const specsMap = parseSpecsString(s.specs)
+          return {
+            ...s,
+            price: Number(s.price),
+            stock: Number(s.stock),
+            specs: JSON.stringify(specsMap),
+            specsMap
+          }
+        })
       }
       
       // 特殊处理详情 (从 customAttributes 取回)
@@ -406,7 +634,7 @@ const handlePublish = async () => {
         price: Number(s.price),
         stock: Number(s.stock),
         image: s.image || form.mainImage,
-        specs: s.specs || '{}'
+        specs: JSON.stringify(parseSpecsString(s.specsMap || s.specs))
       })),
       
       // 适配详情字段
@@ -632,6 +860,101 @@ onMounted(() => {
 
 .add-sku-btn:active {
   background: rgba(255, 36, 66, 0.06);
+}
+
+.spec-schema {
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #fff;
+  margin-bottom: 12px;
+}
+
+.spec-mode-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.spec-mode-btn {
+  flex: 1;
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #666;
+}
+
+.spec-mode-btn.active {
+  border-color: #ff2442;
+  color: #ff2442;
+  background: rgba(255, 36, 66, 0.04);
+}
+
+.spec-group {
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.spec-title {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.spec-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.spec-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #333;
+  background: #fafafa;
+  border: 1px solid #eee;
+  padding: 6px 10px;
+  border-radius: 16px;
+}
+
+.spec-custom {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.spec-custom-input {
+  flex: 1;
+}
+
+.spec-custom-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #666;
+}
+
+.spec-custom-btn:hover {
+  border-color: #ff2442;
+  color: #ff2442;
+}
+
+.spec-actions {
+  margin-top: 12px;
+}
+
+.sku-spec-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
 }
 
 /* 图片上传样式 */

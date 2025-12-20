@@ -25,7 +25,9 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import com.itcast.mapper.CommentLikeMapper;
 import com.itcast.model.pojo.CommentLike;
@@ -137,14 +139,39 @@ public class CommentServiceImpl implements CommentService {
         List<Comment> commentList = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
                 .eq(Comment::getNoteId, noteId)
                 .orderByDesc(Comment::getId));
+
+        Map<Integer, User> userCache = new HashMap<>();
+        Set<Integer> needQueryUserIds = new HashSet<>();
+        for (Comment comment : commentList) {
+            if (comment.getUserId() != null) {
+                needQueryUserIds.add(comment.getUserId());
+            }
+            if (comment.getTargetUserId() != null) {
+                needQueryUserIds.add(comment.getTargetUserId());
+            }
+        }
+        for (Integer needQueryUserId : needQueryUserIds) {
+            try {
+                Result<User> userResult = userClient.getUserById(needQueryUserId);
+                if (userResult != null && userResult.getData() != null) {
+                    userCache.put(needQueryUserId, userResult.getData());
+                } else {
+                    userCache.put(needQueryUserId, null);
+                }
+            } catch (Exception e) {
+                log.error("获取用户信息失败 userId:{}", needQueryUserId, e);
+                userCache.put(needQueryUserId, null);
+            }
+        }
+
         // 2.根据parentId=0获取所有一级评论列表
         List<Comment> parentList = commentList.stream()
                 .filter(comment -> comment.getParentId() != null && comment.getParentId() == 0)
                 .collect(Collectors.toList());
         // 3.构建树模型
         for (Comment comment : parentList) {
-            CommentVo commentVo = convertToCommentVo(comment, likedCommentIds);
-            commentVo.setChildrenList(buildChildrenList(comment.getId(), commentList, likedCommentIds));
+            CommentVo commentVo = convertToCommentVo(comment, likedCommentIds, userCache);
+            commentVo.setChildrenList(buildChildrenList(comment.getId(), commentList, likedCommentIds, userCache));
             commentVoList.add(commentVo);
         }
         return Result.success(commentVoList);
@@ -218,7 +245,7 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds) throws ParseException {
+    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds, Map<Integer, User> userCache) throws ParseException {
         String dealTime = "";
         try {
              dealTime = DealTimeUtil.dealTime(
@@ -242,25 +269,15 @@ public class CommentServiceImpl implements CommentService {
 
         // 设置用户信息
         if (comment.getUserId() != null) {
-            try {
-                Result<User> userResult = userClient.getUserById(comment.getUserId());
-                if (userResult != null && userResult.getData() != null) {
-                    commentVo.setUser(userResult.getData());
-                }
-            } catch (Exception e) {
-                log.error("获取用户信息失败 userId:{}", comment.getUserId(), e);
-            }
+            User user = userCache.get(comment.getUserId());
+            commentVo.setUser(user);
         }
 
         // 设置回复目标用户昵称
         if (comment.getTargetUserId() != null) {
-            try {
-                Result<User> targetUserResult = userClient.getUserById(comment.getTargetUserId());
-                if (targetUserResult != null && targetUserResult.getData() != null) {
-                    commentVo.setReplyToUser(targetUserResult.getData().getNickname());
-                }
-            } catch (Exception e) {
-                log.error("获取回复目标用户信息失败 targetUserId:{}", comment.getTargetUserId(), e);
+            User targetUser = userCache.get(comment.getTargetUserId());
+            if (targetUser != null) {
+                commentVo.setReplyToUser(targetUser.getNickname());
             }
         }
 
@@ -275,12 +292,12 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds) throws ParseException {
+    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds, Map<Integer, User> userCache) throws ParseException {
         List<CommentVo> childrenVoList = new ArrayList<>();
         for (Comment comment : commentList) {
             if (parentId.equals(comment.getParentId())) {
-                CommentVo commentVo = convertToCommentVo(comment, likedCommentIds);
-                commentVo.setChildrenList(buildChildrenList(comment.getId(), commentList, likedCommentIds));
+                CommentVo commentVo = convertToCommentVo(comment, likedCommentIds, userCache);
+                commentVo.setChildrenList(buildChildrenList(comment.getId(), commentList, likedCommentIds, userCache));
                 childrenVoList.add(commentVo);
             }
         }

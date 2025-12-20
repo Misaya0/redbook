@@ -66,3 +66,68 @@ CREATE TABLE `rb_sku` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品SKU表';
 
 ALTER TABLE `rb_product` ADD COLUMN `price` decimal(10,2) DEFAULT NULL COMMENT '展示价格';
+
+CREATE TABLE `rb_spec` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `spec_code` varchar(64) NOT NULL COMMENT '规格编码(稳定key, 如 color/size/storage/package)',
+  `spec_name` varchar(64) NOT NULL COMMENT '规格名称(展示用)',
+  `display_type` varchar(16) NOT NULL DEFAULT 'chip' COMMENT '展示类型: chip/list',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_spec_code` (`spec_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='规格组定义';
+
+CREATE TABLE `rb_spec_option` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `spec_id` bigint NOT NULL COMMENT '规格组ID',
+  `option_value` varchar(64) NOT NULL COMMENT '选项值(稳定值)',
+  `option_label` varchar(255) NOT NULL COMMENT '选项展示文案',
+  `image` varchar(255) DEFAULT NULL COMMENT '选项图片(可选)',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+  PRIMARY KEY (`id`),
+  KEY `idx_spec` (`spec_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='规格组选项';
+
+CREATE TABLE `rb_category_spec` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `category_id` bigint NOT NULL COMMENT '品类ID',
+  `spec_id` bigint NOT NULL COMMENT '规格组ID',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '规格组在该品类下的排序',
+  `required` tinyint NOT NULL DEFAULT '1' COMMENT '是否必选: 0-否,1-是',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_category_spec` (`category_id`,`spec_id`),
+  KEY `idx_category` (`category_id`),
+  KEY `idx_spec` (`spec_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='品类-规格组关系';
+
+INSERT INTO `rb_spec` (`spec_code`,`spec_name`,`display_type`,`sort`) VALUES
+('version','版本','chip',10),
+('color','颜色分类','list',20),
+('disk','硬盘容量','chip',30),
+('ram','内存容量','chip',40),
+('storage','存储容量','chip',30),
+('size','尺码','chip',30),
+('package','套餐类型','chip',50);
+
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 1, id, 10, 1 FROM `rb_spec` WHERE `spec_code` = 'version';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 1, id, 20, 1 FROM `rb_spec` WHERE `spec_code` = 'color';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 1, id, 30, 1 FROM `rb_spec` WHERE `spec_code` = 'disk';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 1, id, 40, 1 FROM `rb_spec` WHERE `spec_code` = 'ram';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 1, id, 50, 0 FROM `rb_spec` WHERE `spec_code` = 'package';
+
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 2, id, 10, 1 FROM `rb_spec` WHERE `spec_code` = 'color';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 2, id, 20, 1 FROM `rb_spec` WHERE `spec_code` = 'storage';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 2, id, 30, 0 FROM `rb_spec` WHERE `spec_code` = 'package';
+
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 5, id, 10, 1 FROM `rb_spec` WHERE `spec_code` = 'color';
+INSERT INTO `rb_category_spec` (`category_id`,`spec_id`,`sort`,`required`)
+SELECT 5, id, 20, 1 FROM `rb_spec` WHERE `spec_code` = 'size';

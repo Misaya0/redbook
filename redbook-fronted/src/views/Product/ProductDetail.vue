@@ -44,17 +44,7 @@
       <!-- 规格选择 -->
       <div class="sku-selector card" v-if="product.skus && product.skus.length > 0">
         <div class="section-title">规格选择</div>
-        <div class="sku-list">
-          <div 
-            v-for="sku in product.skus" 
-            :key="sku.id" 
-            class="sku-item"
-            :class="{ active: selectedSkuId === sku.id, disabled: sku.stock <= 0 }"
-            @click="selectSku(sku)"
-          >
-            {{ sku.name }}
-          </div>
-        </div>
+        <SpecSelector :skus="product.skus" :spec-groups="specGroups" v-model:skuId="selectedSkuId" />
       </div>
 
       <!-- 店铺信息 -->
@@ -117,9 +107,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProductDetail } from '@/api/product'
+import { getProductDetail, getProductSpecs } from '@/api/product'
 import { getImageUrl } from '@/utils/image'
 import { useModal } from '@/utils/modal'
+import SpecSelector from './components/SpecSelector.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -130,6 +121,7 @@ const loading = ref(true)
 const error = ref(null)
 const product = ref({})
 const selectedSkuId = ref(null)
+const specGroups = ref([])
 
 // 计算属性
 const currentPrice = computed(() => {
@@ -155,6 +147,12 @@ const fetchProduct = async () => {
   try {
     const res = await getProductDetail(productId)
     product.value = res
+    try {
+      const specRes = await getProductSpecs(productId, { skipErrorHandler: true })
+      specGroups.value = specRes?.specGroups || []
+    } catch (e) {
+      specGroups.value = []
+    }
     // 默认选中第一个有库存的 SKU
     if (res.skus && res.skus.length > 0) {
       const validSku = res.skus.find(s => s.stock > 0)
@@ -166,11 +164,6 @@ const fetchProduct = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const selectSku = (sku) => {
-  if (sku.stock <= 0) return
-  selectedSkuId.value = sku.id
 }
 
 const handleBuy = () => {
@@ -395,32 +388,6 @@ onMounted(() => {
   font-weight: bold;
   margin-bottom: 12px;
   color: #333;
-}
-
-.sku-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.sku-item {
-  padding: 6px 12px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #333;
-  border: 1px solid transparent;
-}
-
-.sku-item.active {
-  background: #fff0f2;
-  border-color: #ff2442;
-  color: #ff2442;
-}
-
-.sku-item.disabled {
-  color: #ccc;
-  background: #f9f9f9;
 }
 
 .shop-header {

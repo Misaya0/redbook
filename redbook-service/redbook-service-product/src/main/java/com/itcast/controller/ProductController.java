@@ -4,7 +4,9 @@ import com.itcast.model.dto.ProductDto;
 import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
+import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
+import com.itcast.model.vo.SpecGroupVo;
 import com.itcast.result.Result;
 import com.itcast.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +49,20 @@ public class ProductController {
     public Result<ProductVo> getProduct(
             @Parameter(description = "商品ID", required = true) @PathVariable("productId") Integer productId) {
         return productService.getProduct(productId);
+    }
+
+    @Operation(summary = "获取商品规格Schema", description = "按品类返回规格组与SKU规格映射")
+    @GetMapping("/getProductSpecs/{productId}")
+    public Result<ProductSpecsVo> getProductSpecs(
+            @Parameter(description = "商品ID", required = true) @PathVariable("productId") Integer productId) {
+        return productService.getProductSpecs(productId);
+    }
+
+    @Operation(summary = "获取品类规格Schema", description = "按品类返回规格组与选项")
+    @GetMapping("/getCategorySpecs/{categoryId}")
+    public Result<List<SpecGroupVo>> getCategorySpecs(
+            @Parameter(description = "品类ID", required = true) @PathVariable("categoryId") Integer categoryId) {
+        return productService.getCategorySpecs(categoryId);
     }
 
     @Operation(summary = "按店铺获取商品", description = "获取指定店铺的所有商品")

@@ -4,6 +4,8 @@ import com.itcast.model.dto.ProductDto;
 import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
+import com.itcast.model.vo.SpecGroupVo;
+import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
 import com.itcast.result.Result;
 
@@ -19,6 +21,10 @@ public interface ProductService {
     Result<List<ProductEsDTO>> getProductEsList(Integer pageNum, Integer pageSize);
 
     Result<ProductVo> getProduct(Integer productId);
+
+    Result<ProductSpecsVo> getProductSpecs(Integer productId);
+
+    Result<List<SpecGroupVo>> getCategorySpecs(Integer categoryId);
 
     Result<List<Product>> getProductByShop(Integer shopId);
 

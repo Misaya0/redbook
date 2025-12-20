@@ -2,17 +2,25 @@ package com.itcast.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itcast.client.NoteClient;
+import com.itcast.mapper.CategorySpecMapper;
 import com.itcast.mapper.ProductBrowseMapper;
 import com.itcast.mapper.ProductMapper;
 import com.itcast.mapper.ShopMapper;
 import com.itcast.mapper.SkuMapper;
+import com.itcast.mapper.SpecMapper;
+import com.itcast.mapper.SpecOptionMapper;
 import com.itcast.model.dto.ProductDto;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.*;
 import com.itcast.model.vo.NoteSimpleVo;
+import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
+import com.itcast.model.vo.SpecGroupVo;
+import com.itcast.model.vo.SpecOptionVo;
+import com.itcast.model.vo.SkuSpecVo;
 import com.itcast.result.Result;
 import com.itcast.service.ProductService;
 import com.itcast.context.UserContext;
@@ -31,11 +39,9 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 
 import com.itcast.mapper.CategoryMapper;
 
@@ -61,6 +67,15 @@ public class ProductServiceImpl implements ProductService {
     
     @Autowired
     private SkuMapper skuMapper;
+
+    @Autowired
+    private SpecMapper specMapper;
+
+    @Autowired
+    private SpecOptionMapper specOptionMapper;
+
+    @Autowired
+    private CategorySpecMapper categorySpecMapper;
 
     @Autowired
     private ShopMapper shopMapper;
@@ -279,6 +294,7 @@ public class ProductServiceImpl implements ProductService {
                 if (!StringUtils.hasText(sku.getImage())) {
                     sku.setImage(product.getMainImage());
                 }
+                sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
                 skuMapper.insert(sku);
             }
         }
@@ -326,6 +342,7 @@ public class ProductServiceImpl implements ProductService {
                 if (!StringUtils.hasText(sku.getImage())) {
                     sku.setImage(product.getMainImage());
                 }
+                sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
                 
                 if (sku.getPrice() != null) {
                     prices.add(sku.getPrice());
@@ -359,6 +376,25 @@ public class ProductServiceImpl implements ProductService {
         sendProductSyncMessage(product, "save");
 
         return Result.success(null);
+    }
+
+    @Override
+    public Result<List<SpecGroupVo>> getCategorySpecs(Integer categoryId) {
+        if (categoryId == null) {
+            return Result.failure("品类ID不能为空");
+        }
+        Long cid = Long.valueOf(categoryId);
+        Category category = categoryMapper.selectById(cid);
+        Long effectiveCategoryId = cid;
+        if (category != null && category.getParentId() != null && category.getParentId() > 0) {
+            effectiveCategoryId = category.getParentId();
+        }
+
+        List<SpecGroupVo> groups = buildSpecGroups(effectiveCategoryId, new ArrayList<>());
+        if ((groups == null || groups.isEmpty()) && effectiveCategoryId.longValue() != cid.longValue()) {
+            groups = buildSpecGroups(cid, new ArrayList<>());
+        }
+        return Result.success(groups);
     }
 
     @Override
@@ -420,6 +456,265 @@ public class ProductServiceImpl implements ProductService {
             return productVo;
         }).collect(Collectors.toList());
         return Result.success(productVos, productPage.getTotal());
+    }
+
+    @Override
+    public Result<ProductSpecsVo> getProductSpecs(Integer productId) {
+        Product product = productMapper.selectById(productId);
+        if (product == null) {
+            return Result.failure("商品不存在");
+        }
+
+        List<Sku> skus = skuMapper.selectList(
+                new LambdaQueryWrapper<Sku>().eq(Sku::getProductId, product.getId())
+        );
+
+        List<SkuSpecVo> skuVos = buildSkuSpecVos(skus);
+        List<SpecGroupVo> groups = buildSpecGroups(product.getCategoryId(), skuVos);
+
+        ProductSpecsVo vo = new ProductSpecsVo();
+        vo.setProductId(product.getId());
+        vo.setSpecGroups(groups);
+        vo.setSkus(skuVos);
+        return Result.success(vo);
+    }
+
+    private List<SkuSpecVo> buildSkuSpecVos(List<Sku> skus) {
+        if (skus == null || skus.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<SkuSpecVo> list = new ArrayList<>();
+        for (Sku sku : skus) {
+            SkuSpecVo vo = new SkuSpecVo();
+            vo.setId(sku.getId());
+            vo.setName(sku.getName());
+            vo.setPrice(sku.getPrice());
+            vo.setStock(sku.getStock());
+            vo.setImage(sku.getImage());
+            vo.setSpecs(parseSpecsMap(sku.getSpecs()));
+            list.add(vo);
+        }
+        return list;
+    }
+
+    private Map<String, String> parseSpecsMap(String specs) {
+        if (!StringUtils.hasText(specs)) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return objectMapper.readValue(specs, new TypeReference<Map<String, String>>() {
+            });
+        } catch (Exception e) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private String normalizeSpecsJson(String specs) {
+        if (!StringUtils.hasText(specs)) {
+            return "{}";
+        }
+        try {
+            Map<String, Object> map = objectMapper.readValue(specs, new TypeReference<Map<String, Object>>() {
+            });
+            if (map == null || map.isEmpty()) {
+                return "{}";
+            }
+            Map<String, String> normalized = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                String k = entry.getKey();
+                Object v = entry.getValue();
+                if (!StringUtils.hasText(k) || v == null) {
+                    continue;
+                }
+                String sv = String.valueOf(v);
+                if (!StringUtils.hasText(sv)) {
+                    continue;
+                }
+                normalized.put(k, sv);
+            }
+            if (normalized.isEmpty()) {
+                return "{}";
+            }
+            return objectMapper.writeValueAsString(normalized);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private List<SpecGroupVo> buildSpecGroups(Long categoryId, List<SkuSpecVo> skuVos) {
+        List<CategorySpec> relations = categorySpecMapper.selectList(
+                new LambdaQueryWrapper<CategorySpec>()
+                        .eq(CategorySpec::getCategoryId, categoryId)
+                        .orderByAsc(CategorySpec::getSort)
+        );
+        if (relations == null || relations.isEmpty()) {
+            Category category = categoryMapper.selectById(categoryId);
+            if (category != null && category.getParentId() != null && category.getParentId() > 0) {
+                relations = categorySpecMapper.selectList(
+                        new LambdaQueryWrapper<CategorySpec>()
+                                .eq(CategorySpec::getCategoryId, category.getParentId())
+                                .orderByAsc(CategorySpec::getSort)
+                );
+            }
+        }
+        if (relations == null || relations.isEmpty()) {
+            return inferSpecGroupsFromSkus(skuVos);
+        }
+
+        List<Long> specIds = relations.stream().map(CategorySpec::getSpecId).distinct().collect(Collectors.toList());
+        List<Spec> specs = specMapper.selectBatchIds(specIds);
+        Map<Long, Spec> specById = specs == null ? new LinkedHashMap<>() : specs.stream()
+                .collect(Collectors.toMap(Spec::getId, s -> s, (a, b) -> a, LinkedHashMap::new));
+
+        List<SpecOption> options = specOptionMapper.selectList(
+                new LambdaQueryWrapper<SpecOption>()
+                        .in(SpecOption::getSpecId, specIds)
+                        .orderByAsc(SpecOption::getSort)
+        );
+        Map<Long, List<SpecOption>> optionsBySpecId = options == null ? new LinkedHashMap<>() : options.stream()
+                .collect(Collectors.groupingBy(SpecOption::getSpecId, LinkedHashMap::new, Collectors.toList()));
+
+        List<SpecGroupVo> groups = new ArrayList<>();
+        for (CategorySpec relation : relations) {
+            Spec spec = specById.get(relation.getSpecId());
+            if (spec == null) {
+                continue;
+            }
+            SpecGroupVo group = new SpecGroupVo();
+            group.setKey(spec.getSpecCode());
+            group.setTitle(spec.getSpecName());
+            group.setDisplayType(spec.getDisplayType());
+
+            List<SpecOption> optList = optionsBySpecId.getOrDefault(spec.getId(), new ArrayList<>());
+            List<SpecOptionVo> optVos;
+            List<SpecOptionVo> inferredOptVos = inferSpecOptionsFromSkus(spec.getSpecCode(), skuVos);
+            if (inferredOptVos != null && !inferredOptVos.isEmpty()) {
+                if (optList == null || optList.isEmpty()) {
+                    optVos = inferredOptVos;
+                } else {
+                    Map<String, SpecOption> optionByValueOrLabel = new HashMap<>();
+                    for (SpecOption opt : optList) {
+                        if (opt == null) {
+                            continue;
+                        }
+                        if (StringUtils.hasText(opt.getOptionValue())) {
+                            optionByValueOrLabel.put(opt.getOptionValue(), opt);
+                        }
+                        if (StringUtils.hasText(opt.getOptionLabel())) {
+                            optionByValueOrLabel.put(opt.getOptionLabel(), opt);
+                        }
+                    }
+                    List<SpecOptionVo> merged = new ArrayList<>();
+                    for (SpecOptionVo inferred : inferredOptVos) {
+                        if (inferred == null || !StringUtils.hasText(inferred.getValue())) {
+                            continue;
+                        }
+                        SpecOptionVo optVo = new SpecOptionVo();
+                        optVo.setValue(inferred.getValue());
+                        optVo.setLabel(inferred.getLabel());
+                        SpecOption raw = optionByValueOrLabel.get(inferred.getValue());
+                        if (raw != null && StringUtils.hasText(raw.getImage())) {
+                            optVo.setImage(raw.getImage());
+                        }
+                        merged.add(optVo);
+                    }
+                    optVos = merged;
+                }
+            } else if (optList == null || optList.isEmpty()) {
+                optVos = new ArrayList<>();
+            } else {
+                optVos = optList.stream().map(opt -> {
+                    SpecOptionVo optVo = new SpecOptionVo();
+                    optVo.setValue(opt.getOptionValue());
+                    optVo.setLabel(opt.getOptionLabel());
+                    optVo.setImage(opt.getImage());
+                    return optVo;
+                }).collect(Collectors.toList());
+            }
+            group.setOptions(optVos);
+            groups.add(group);
+        }
+        return groups;
+    }
+
+    private List<SpecOptionVo> inferSpecOptionsFromSkus(String specCode, List<SkuSpecVo> skuVos) {
+        if (!StringUtils.hasText(specCode) || skuVos == null || skuVos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Set<String> values = new HashSet<>();
+        for (SkuSpecVo sku : skuVos) {
+            Map<String, String> map = sku.getSpecs();
+            if (map == null) {
+                continue;
+            }
+            String v = map.get(specCode);
+            if (StringUtils.hasText(v)) {
+                values.add(v);
+            }
+        }
+        List<String> sortedValues = new ArrayList<>(values);
+        sortedValues.sort(String::compareTo);
+        return sortedValues.stream().map(v -> {
+            SpecOptionVo opt = new SpecOptionVo();
+            opt.setValue(v);
+            opt.setLabel(v);
+            return opt;
+        }).collect(Collectors.toList());
+    }
+
+    private List<SpecGroupVo> inferSpecGroupsFromSkus(List<SkuSpecVo> skuVos) {
+        Set<String> keys = new HashSet<>();
+        Map<String, Set<String>> valuesByKey = new LinkedHashMap<>();
+        for (SkuSpecVo sku : skuVos) {
+            Map<String, String> map = sku.getSpecs();
+            if (map == null) {
+                continue;
+            }
+            for (Map.Entry<String, String> entry : map.entrySet()) {
+                String k = entry.getKey();
+                String v = entry.getValue();
+                if (!StringUtils.hasText(k) || !StringUtils.hasText(v)) {
+                    continue;
+                }
+                keys.add(k);
+                valuesByKey.computeIfAbsent(k, kk -> new HashSet<>()).add(v);
+            }
+        }
+
+        List<String> orderedKeys = new ArrayList<>(keys);
+        List<String> defaultOrder = List.of("version", "color", "disk", "ram", "storage", "size", "package");
+        orderedKeys.sort(Comparator.<String>comparingInt(k -> {
+            int idx = defaultOrder.indexOf(k);
+            return idx < 0 ? 999 : idx;
+        }).thenComparing(Comparator.naturalOrder()));
+
+        List<SpecGroupVo> groups = new ArrayList<>();
+        Map<String, String> titleMap = new LinkedHashMap<>();
+        titleMap.put("version", "版本");
+        titleMap.put("color", "颜色分类");
+        titleMap.put("disk", "硬盘容量");
+        titleMap.put("ram", "内存容量");
+        titleMap.put("storage", "存储容量");
+        titleMap.put("size", "尺码");
+        titleMap.put("package", "套餐类型");
+        for (String key : orderedKeys) {
+            SpecGroupVo group = new SpecGroupVo();
+            group.setKey(key);
+            group.setTitle(titleMap.getOrDefault(key, key));
+            group.setDisplayType(key.toLowerCase().contains("color") ? "list" : "chip");
+            Set<String> values = valuesByKey.getOrDefault(key, new HashSet<>());
+            List<String> sortedValues = new ArrayList<>(values);
+            sortedValues.sort(String::compareTo);
+            List<SpecOptionVo> options = sortedValues.stream().map(v -> {
+                SpecOptionVo opt = new SpecOptionVo();
+                opt.setValue(v);
+                opt.setLabel(v);
+                return opt;
+            }).collect(Collectors.toList());
+            group.setOptions(options);
+            groups.add(group);
+        }
+        return groups;
     }
 
     @Override
