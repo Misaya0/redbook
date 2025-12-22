@@ -16,9 +16,24 @@ public class OrderDto implements Serializable {
     private Integer productId;
 
     /**
+     * 店铺id
+     */
+    private Integer shopId;
+
+    /**
+     * skuId
+     */
+    private Long skuId;
+
+    /**
      * 产品价格
      */
     private BigDecimal price;
+
+    /**
+     * sku单价快照
+     */
+    private BigDecimal skuPrice;
 
     /**
      * 选择的属性
@@ -41,6 +56,11 @@ public class OrderDto implements Serializable {
     private BigDecimal couponPrice;
 
     /**
+     * 最终价格
+     */
+    private BigDecimal finalPrice;
+
+    /**
      * 消息唯一标识（用于幂等性控制）
      */
     private String messageId;
@@ -49,4 +69,9 @@ public class OrderDto implements Serializable {
      * 用户ID
      */
     private Integer userId;
+
+    /**
+     * 商品名称（冗余）
+     */
+    private String productName;
 }

@@ -1,10 +1,12 @@
 package com.itcast.model.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Product implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -12,6 +14,11 @@ public class Product implements Serializable {
      * 主键
      */
     private Integer id;
+
+    /**
+     * 分类id（商品服务返回的字段）
+     */
+    private Integer categoryId;
 
     /**
      * 商品名称
@@ -27,6 +34,8 @@ public class Product implements Serializable {
      * 商品图片
      */
     private String image;
+
+    private String mainImage;
 
     /**
      * 发布时间

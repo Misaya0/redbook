@@ -36,4 +36,11 @@ public class ShopController {
             @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
         return shopService.getShopByUserId(userId);
     }
+
+    @Operation(summary = "根据店铺ID获取店铺", description = "根据店铺ID获取店铺信息")
+    @GetMapping("/getShopById/{shopId}")
+    public Result<Shop> getShopById(
+            @Parameter(description = "店铺ID", required = true) @PathVariable("shopId") Integer shopId) {
+        return shopService.getShopById(shopId);
+    }
 }

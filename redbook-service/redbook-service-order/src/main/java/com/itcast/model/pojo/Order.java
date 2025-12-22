@@ -25,9 +25,21 @@ public class Order {
     private Integer productId;
 
     /**
+     * 店铺id（冗余字段，便于按店铺分页查询）
+     */
+    @TableField("shop_id")
+    private Integer shopId;
+
+    @TableField("sku_id")
+    private Long skuId;
+
+    /**
      * 商品数量
      */
     private Integer quantity;
+
+    @TableField("sku_price")
+    private BigDecimal skuPrice;
 
     /**
      * 优惠券id
@@ -57,4 +69,10 @@ public class Order {
      */
     @TableField("create_time")
     private String createTime;
+
+    /**
+     * 商品名称（冗余字段）
+     */
+    @TableField("product_name")
+    private String productName;
 }

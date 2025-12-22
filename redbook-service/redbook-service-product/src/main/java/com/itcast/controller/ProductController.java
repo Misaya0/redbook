@@ -4,6 +4,7 @@ import com.itcast.model.dto.ProductDto;
 import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
+import com.itcast.model.pojo.Sku;
 import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
 import com.itcast.model.vo.SpecGroupVo;
@@ -113,5 +114,40 @@ public class ProductController {
             @Parameter(description = "父分类ID") @RequestParam(required = false) Integer parentId,
             @Parameter(description = "层级") @RequestParam(required = false) Integer level) {
         return productService.getCategoryList(parentId, level);
+    }
+
+    @Operation(summary = "获取SKU详情", description = "根据skuId获取SKU信息")
+    @GetMapping("/getSku/{skuId}")
+    public Result<Sku> getSku(
+            @Parameter(description = "SKU ID", required = true) @PathVariable("skuId") Long skuId) {
+        return productService.getSku(skuId);
+    }
+
+    public static class DecreaseStockRequest {
+        public Long skuId;
+        public Integer quantity;
+    }
+
+    @Operation(summary = "扣减SKU库存", description = "按SKU维度扣减库存（原子校验 stock>=quantity）")
+    @PostMapping("/decreaseSkuStock")
+    public Result<Void> decreaseSkuStock(@RequestBody DecreaseStockRequest request) {
+        if (request == null) {
+            return Result.failure("参数不能为空");
+        }
+        return productService.decreaseSkuStock(request.skuId, request.quantity);
+    }
+
+    public static class IncreaseStockRequest {
+        public Long skuId;
+        public Integer quantity;
+    }
+
+    @Operation(summary = "回补SKU库存", description = "按SKU维度回补库存（用于下单失败补偿）")
+    @PostMapping("/increaseSkuStock")
+    public Result<Void> increaseSkuStock(@RequestBody IncreaseStockRequest request) {
+        if (request == null) {
+            return Result.failure("参数不能为空");
+        }
+        return productService.increaseSkuStock(request.skuId, request.quantity);
     }
 }

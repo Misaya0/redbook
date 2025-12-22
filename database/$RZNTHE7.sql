@@ -235,15 +235,24 @@ USE `rb_order`;
 CREATE TABLE IF NOT EXISTS `rb_order` (
     `id` BIGINT(20) NOT NULL COMMENT '主键（雪花算法）',
     `product_id` INT(11) NOT NULL COMMENT '产品id',
+    `shop_id` INT(11) DEFAULT NULL COMMENT '店铺id',
+    `sku_id` BIGINT(20) DEFAULT NULL COMMENT 'skuId',
     `quantity` INT(11) DEFAULT 1 COMMENT '商品数量',
+    `sku_price` DECIMAL(10,2) DEFAULT NULL COMMENT 'sku单价快照',
     `coupon_id` INT(11) DEFAULT NULL COMMENT '优惠券id',
     `final_price` DECIMAL(10,2) DEFAULT NULL COMMENT '最终价格',
     `user_id` INT(11) NOT NULL COMMENT '订单归属人ID',
-    `status` INT(11) DEFAULT 0 COMMENT '状态（0-待支付，1-已支付，2-已发货，3-已完成，4-已取消）',
+    `status` INT(11) DEFAULT 0 COMMENT '状态（0-待付款，1-已付款，2-已取消，3-已发货，4-已完成）',
+    `create_time` VARCHAR(20) DEFAULT NULL COMMENT '创建时间',
+    `product_name` VARCHAR(255) DEFAULT NULL COMMENT '商品名称',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_product_id` (`product_id`),
-    KEY `idx_status` (`status`)
+    KEY `idx_shop_id` (`shop_id`),
+    KEY `idx_sku_id` (`sku_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_shop_status` (`shop_id`, `status`),
+    KEY `idx_product_name` (`product_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
 -- 订单属性表
@@ -271,4 +280,3 @@ CREATE TABLE IF NOT EXISTS `rb_history` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='搜索历史表';
-

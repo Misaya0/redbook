@@ -22,6 +22,12 @@ public interface OrderService {
     
     Result<OrderStatisticsVo> getStatistics();
 
+    Result<Long> getServerTime();
+
+    Result<Integer> getPaymentTimeoutSeconds();
+
+    Result<Void> timeoutCancelOrder(Long orderId);
+
     /**
      * 处理消息队列中的订单保存（带事务）
      * @param orderDto 订单DTO

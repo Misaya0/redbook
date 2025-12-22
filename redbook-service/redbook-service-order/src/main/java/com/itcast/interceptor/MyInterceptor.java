@@ -1,6 +1,7 @@
 package com.itcast.interceptor;
 
 import com.itcast.context.UserContext;
+import com.itcast.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -16,10 +17,27 @@ public class MyInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         log.info("前置拦截器");
-        // 1. 获取用户id
         String userId = request.getHeader("userId");
+
+        if (userId == null) {
+            String authorization = request.getHeader("Authorization");
+            String token = null;
+            if (authorization != null && authorization.startsWith("Bearer ")) {
+                token = authorization.substring(7);
+            } else {
+                token = request.getHeader("token");
+            }
+
+            if (token != null) {
+                try {
+                    userId = JwtUtil.parseToken(token);
+                } catch (Exception e) {
+                    log.error("解析 token 失败", e);
+                }
+            }
+        }
+
         if (userId != null) {
-            // 2. 设置用户id
             log.info("用户id为：{}", userId);
             UserContext.setUserId(Integer.valueOf(userId));
         }

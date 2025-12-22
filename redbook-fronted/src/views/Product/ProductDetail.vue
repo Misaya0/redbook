@@ -108,6 +108,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProductDetail, getProductSpecs } from '@/api/product'
+import { saveOrder } from '@/api/order'
 import { getImageUrl } from '@/utils/image'
 import { useModal } from '@/utils/modal'
 import SpecSelector from './components/SpecSelector.vue'
@@ -166,13 +167,21 @@ const fetchProduct = async () => {
   }
 }
 
-const handleBuy = () => {
+const handleBuy = async () => {
   if (!selectedSkuId.value && product.value.skus && product.value.skus.length > 0) {
     showToast('请选择规格')
     return
   }
-  showToast('跳转下单页...')
-  // router.push({ name: 'OrderCreate', query: { skuId: selectedSkuId.value } })
+  try {
+    await saveOrder({
+      skuId: selectedSkuId.value,
+      quantity: 1
+    })
+    showToast('下单成功')
+    router.push('/orders')
+  } catch (e) {
+    showToast('下单失败')
+  }
 }
 
 const handleShare = async () => {

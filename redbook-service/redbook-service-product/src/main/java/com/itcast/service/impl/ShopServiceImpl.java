@@ -69,4 +69,16 @@ public class ShopServiceImpl implements ShopService {
         
         return Result.success(shop);
     }
+
+    @Override
+    public Result<Shop> getShopById(Integer shopId) {
+        if (shopId == null) {
+            return Result.failure("店铺ID不能为空");
+        }
+        Shop shop = shopMapper.selectById(shopId);
+        if (shop == null) {
+            return Result.failure("店铺不存在");
+        }
+        return Result.success(shop);
+    }
 }

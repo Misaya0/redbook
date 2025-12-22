@@ -133,7 +133,7 @@
               <span class="icon">📦</span>
               <span>商品管理</span>
             </div>
-            <div class="action-item" @click="$router.push('/orders')">
+            <div class="action-item" @click="$router.push('/merchant/orders')">
               <span class="icon">📄</span>
               <span>订单管理</span>
             </div>

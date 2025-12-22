@@ -4,6 +4,7 @@ import com.itcast.model.dto.ProductDto;
 import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.Product;
+import com.itcast.model.pojo.Sku;
 import com.itcast.model.vo.SpecGroupVo;
 import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
@@ -39,4 +40,10 @@ public interface ProductService {
     Result<String> uploadImage(MultipartFile file) throws IOException;
 
     Result<List<Category>> getCategoryList(Integer parentId, Integer level);
+
+    Result<Sku> getSku(Long skuId);
+
+    Result<Void> decreaseSkuStock(Long skuId, Integer quantity);
+
+    Result<Void> increaseSkuStock(Long skuId, Integer quantity);
 }

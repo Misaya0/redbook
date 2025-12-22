@@ -4,6 +4,7 @@ import com.itcast.model.dto.OrderDto;
 import com.itcast.model.dto.OrderSearchDto;
 import com.itcast.model.vo.OrderStatisticsVo;
 import com.itcast.model.vo.OrderVo;
+import com.itcast.context.UserContext;
 import com.itcast.result.Result;
 import com.itcast.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,9 +41,12 @@ public class OrderController {
     @Operation(summary = "获取订单列表", description = "获取当前用户的所有订单")
     @GetMapping("/getOrderList")
     public Result<List<OrderVo>> getOrderList() {
-        // 这里可以调用 searchOrders，传入当前 userId
-        // 但目前先留空，或后续实现
-        return null;
+        OrderSearchDto searchDto = new OrderSearchDto();
+        searchDto.setPageNum(1);
+        searchDto.setPageSize(1000);
+        searchDto.setUserId(UserContext.getUserId());
+        Result<List<OrderVo>> result = orderService.searchOrders(searchDto);
+        return Result.success(result == null ? null : result.getData());
     }
 
     @Operation(summary = "搜索订单", description = "管理后台搜索订单")
@@ -71,5 +75,24 @@ public class OrderController {
     @GetMapping("/statistics")
     public Result<OrderStatisticsVo> getStatistics() {
         return orderService.getStatistics();
+    }
+
+    @Operation(summary = "获取服务端时间", description = "用于前端倒计时与时间同步（毫秒时间戳）")
+    @GetMapping("/serverTime")
+    public Result<Long> getServerTime() {
+        return orderService.getServerTime();
+    }
+
+    @Operation(summary = "获取支付超时时间", description = "用于前端倒计时展示（单位：秒）")
+    @GetMapping("/paymentTimeoutSeconds")
+    public Result<Integer> getPaymentTimeoutSeconds() {
+        return orderService.getPaymentTimeoutSeconds();
+    }
+
+    @Operation(summary = "超时取消订单", description = "仅当订单超时未支付时才允许取消，并回补库存")
+    @PutMapping("/timeoutCancel/{orderId}")
+    public Result<Void> timeoutCancelOrder(
+            @Parameter(description = "订单ID", required = true) @PathVariable Long orderId) {
+        return orderService.timeoutCancelOrder(orderId);
     }
 }

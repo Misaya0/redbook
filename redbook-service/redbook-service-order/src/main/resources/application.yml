@@ -37,3 +37,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+order:
+  payment-timeout-seconds: 120

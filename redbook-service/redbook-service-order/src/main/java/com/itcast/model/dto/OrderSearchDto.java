@@ -11,4 +11,5 @@ public class OrderSearchDto {
     private String endTime;
     private Long orderId;
     private Integer userId;
+    private String keyword;
 }

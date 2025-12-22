@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const state = reactive({
   visible: false,
@@ -61,11 +62,20 @@ export const useModal = () => {
     })
   }
 
+  const showToast = (message, type = 'info', duration = 2000) => {
+    ElMessage({
+      message,
+      type,
+      duration
+    })
+  }
+
   return {
     state,
     showModal,
     hideModal,
     showAlert,
-    showConfirm
+    showConfirm,
+    showToast
   }
 }

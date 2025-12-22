@@ -23,4 +23,6 @@ public interface ShopService {
      * @return 店铺信息
      */
     Result<Shop> getShopByUserId(Integer userId);
+
+    Result<Shop> getShopById(Integer shopId);
 }

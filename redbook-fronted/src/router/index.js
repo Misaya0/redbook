@@ -18,6 +18,7 @@ import ProductManage from '@/views/Merchant/ProductManage.vue'
 import MerchantProfile from '@/views/Merchant/MerchantProfile.vue'
 import ProductPublish from '@/views/Merchant/ProductPublish.vue'
 import OrderList from '@/views/Order/OrderList.vue'
+import OrderListMerchant from '@/views/Order/OrderListMerchant.vue'
 import NoteDetail from '@/views/NoteDetail.vue'
 
 const routes = [
@@ -58,6 +59,12 @@ const routes = [
     path: '/merchant/publish',
     name: 'ProductPublish',
     component: ProductPublish,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/merchant/orders',
+    name: 'OrderListMerchant',
+    component: OrderListMerchant,
     meta: { requiresAuth: true }
   },
   {
@@ -143,6 +150,15 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
+
+  // 如果已登录但 userInfo 为空，优先拉取一次用户信息，便于后续基于角色做路由分流
+  if (userStore.isLoggedIn && !userStore.userInfo) {
+    try {
+      await userStore.getUserInfo()
+    } catch (e) {
+      console.error('路由守卫获取用户信息失败', e)
+    }
+  }
   
   // 1. 处理 /user/:id 跳转到 /profile 的逻辑
   if (to.name === 'UserProfile' && to.params.id) {
@@ -161,6 +177,18 @@ router.beforeEach(async (to, from, next) => {
       next('/profile')
       return
     }
+  }
+
+  // 1.5 商家/用户订单页面分流：商家访问 /orders 自动跳转到 /merchant/orders
+  // 同时禁止普通用户访问商家订单页
+  const isMerchant = userStore.userInfo?.role === 1
+  if (to.path === '/orders' && isMerchant) {
+    next('/merchant/orders')
+    return
+  }
+  if (to.path === '/merchant/orders' && !isMerchant) {
+    next('/orders')
+    return
   }
 
   // 2. 处理需要登录的路由

@@ -1,6 +1,7 @@
 package com.itcast.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -754,5 +756,78 @@ public class ProductServiceImpl implements ProductService {
         }
         queryWrapper.orderByAsc(Category::getSort);
         return Result.success(categoryMapper.selectList(queryWrapper));
+    }
+
+    @Override
+    public Result<Sku> getSku(Long skuId) {
+        if (skuId == null) {
+            return Result.failure("skuId不能为空");
+        }
+        Sku sku = skuMapper.selectById(skuId);
+        if (sku == null) {
+            return Result.failure("SKU不存在");
+        }
+        return Result.success(sku);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> decreaseSkuStock(Long skuId, Integer quantity) {
+        if (skuId == null) {
+            return Result.failure("skuId不能为空");
+        }
+        if (quantity == null || quantity <= 0) {
+            return Result.failure("quantity不合法");
+        }
+
+        Sku sku = skuMapper.selectById(skuId);
+        if (sku == null) {
+            return Result.failure("SKU不存在");
+        }
+
+        LambdaUpdateWrapper<Sku> updateWrapper = new LambdaUpdateWrapper<Sku>()
+                .eq(Sku::getId, skuId)
+                .ge(Sku::getStock, quantity)
+                .setSql("stock = stock - " + quantity);
+
+        int updated = skuMapper.update(null, updateWrapper);
+        if (updated <= 0) {
+            return Result.failure("库存不足");
+        }
+
+        String cacheKey = "product:detail:" + sku.getProductId();
+        stringRedisTemplate.delete(cacheKey);
+
+        return Result.success(null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> increaseSkuStock(Long skuId, Integer quantity) {
+        if (skuId == null) {
+            return Result.failure("skuId不能为空");
+        }
+        if (quantity == null || quantity <= 0) {
+            return Result.failure("quantity不合法");
+        }
+
+        Sku sku = skuMapper.selectById(skuId);
+        if (sku == null) {
+            return Result.failure("SKU不存在");
+        }
+
+        LambdaUpdateWrapper<Sku> updateWrapper = new LambdaUpdateWrapper<Sku>()
+                .eq(Sku::getId, skuId)
+                .setSql("stock = stock + " + quantity);
+
+        int updated = skuMapper.update(null, updateWrapper);
+        if (updated <= 0) {
+            return Result.failure("回补库存失败");
+        }
+
+        String cacheKey = "product:detail:" + sku.getProductId();
+        stringRedisTemplate.delete(cacheKey);
+
+        return Result.success(null);
     }
 }
