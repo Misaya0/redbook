@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.List;
 
 @Tag(name = "用户模块", description = "用户基本信息 / 个人页相关接口")
 @RestController
@@ -32,6 +33,14 @@ public class UserController {
     public Result<User> getUserById(
             @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
         return userService.getUserById(userId);
+    }
+
+    @Operation(summary = "批量查询用户信息", description = "根据用户ID列表批量查询用户详情数据")
+    @PostMapping("/getUsersByIds")
+    public Result<List<User>> getUsersByIds(
+            @Parameter(description = "用户ID列表", required = true) @RequestBody List<Integer> userIds) {
+        // 用于下游服务批量回填用户信息，避免 N+1 远程调用
+        return userService.getUsersByIds(userIds);
     }
 
     @Operation(summary = "更新用户头像", description = "上传用户头像图片文件")

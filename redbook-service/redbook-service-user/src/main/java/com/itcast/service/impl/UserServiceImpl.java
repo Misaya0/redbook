@@ -21,6 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -59,6 +61,16 @@ public class UserServiceImpl implements UserService {
     public Result<User> getUserById(Integer userId) {
         log.info("根据id查询用户信息...");
         return Result.success(userMapper.selectById(userId));
+    }
+
+    @Override
+    public Result<List<User>> getUsersByIds(List<Integer> userIds) {
+        // 空参直接返回空集合，避免不必要的数据库查询
+        if (userIds == null || userIds.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+        // MyBatis-Plus 批量查询：select * from rb_user where id in (...)
+        return Result.success(userMapper.selectBatchIds(userIds));
     }
 
     @Override

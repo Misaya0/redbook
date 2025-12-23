@@ -212,6 +212,10 @@ let timeoutSyncTimer: ReturnType<typeof window.setInterval> | null = null;
 const cancelingByTimeout = ref<Record<string, boolean>>({});
 let countdownTicking = false;
 let timeoutSyncRunning = false;
+let lastServerTimeSyncAtMs = 0;
+let lastTimeoutConfigSyncAtMs = 0;
+const SERVER_TIME_SYNC_MIN_INTERVAL_MS = 60_000;
+const TIMEOUT_CONFIG_TTL_MS = 10 * 60_000;
 
 const formatDateTime = (date: Date) => {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -268,24 +272,36 @@ const getCountdownText = (order: OrderVo) => {
   return `剩余时间：${formatRemaining(ms)}`;
 };
 
-const syncServerTime = async () => {
+const syncServerTime = async (force?: boolean) => {
+  if (!online.value) return;
+  const now = Date.now();
+  if (!force && now - lastServerTimeSyncAtMs < SERVER_TIME_SYNC_MIN_INTERVAL_MS) {
+    return;
+  }
   try {
     const serverMs: any = await getServerTime();
     const parsed = Number(serverMs);
     if (Number.isFinite(parsed) && parsed > 0) {
       serverTimeOffsetMs.value = parsed - Date.now();
+      lastServerTimeSyncAtMs = Date.now();
     }
   } catch {
     // 时间同步失败时继续使用本地时间
   }
 };
 
-const loadTimeoutConfig = async () => {
+const loadTimeoutConfig = async (force?: boolean) => {
+  if (!online.value) return;
+  const now = Date.now();
+  if (!force && now - lastTimeoutConfigSyncAtMs < TIMEOUT_CONFIG_TTL_MS) {
+    return;
+  }
   try {
     const seconds: any = await getPaymentTimeoutSeconds();
     const parsed = Number(seconds);
     if (Number.isFinite(parsed) && parsed > 0) {
       paymentTimeoutSeconds.value = parsed;
+      lastTimeoutConfigSyncAtMs = Date.now();
     }
   } catch {
     // 获取配置失败时继续使用默认值
@@ -399,8 +415,8 @@ const loadData = async () => {
 
 const handleOnline = async () => {
   online.value = true;
-  await loadTimeoutConfig();
-  await syncServerTime();
+  await loadTimeoutConfig(true);
+  await syncServerTime(true);
   refreshCountdownSnapshot();
   await cancelOverdueOrdersOnce({ toast: false });
 };
@@ -409,11 +425,20 @@ const handleOffline = () => {
   online.value = false;
 };
 
+const handleVisibilityChange = async () => {
+  if (document.visibilityState !== 'visible') return;
+  await syncServerTime(true);
+  await loadTimeoutConfig();
+  refreshCountdownSnapshot();
+  await cancelOverdueOrdersOnce({ toast: false });
+};
+
 onMounted(async () => {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
-  await loadTimeoutConfig();
-  await syncServerTime();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  await loadTimeoutConfig(true);
+  await syncServerTime(true);
   await loadData();
   if (!countdownTimer) {
     countdownTimer = window.setInterval(async () => {
@@ -439,11 +464,11 @@ onMounted(async () => {
       if (!online.value) return;
       if (timeoutSyncRunning) return;
       timeoutSyncRunning = true;
-      Promise.allSettled([loadTimeoutConfig(), syncServerTime()])
+      Promise.allSettled([syncServerTime(), loadTimeoutConfig()])
         .finally(() => {
           timeoutSyncRunning = false;
         });
-    }, 15000);
+    }, 60_000);
   }
 });
 
@@ -490,7 +515,8 @@ const openPayDialog = async (row: OrderVo) => {
     return;
   }
 
-  await syncServerTime();
+  await syncServerTime(true);
+  await loadTimeoutConfig();
 
   const localRemaining = remainingMsByOrderId.value[String(row.id)];
   if (typeof localRemaining === 'number' && localRemaining <= 0) {
@@ -609,6 +635,7 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
