@@ -30,6 +30,10 @@ spring:
     username: admin
     password: 123321
     virtual-host: /
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true

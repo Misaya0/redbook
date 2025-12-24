@@ -18,6 +18,7 @@ import com.itcast.model.vo.OrderVo;
 import com.itcast.result.Result;
 import com.itcast.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -25,6 +26,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +52,30 @@ public class OrderServiceImpl implements OrderService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_PAYMENT_TIMEOUT_SECONDS = 120;
+    private static final String SKU_STOCK_KEY_PREFIX = "product:stock:";
+    private static final String MQ_STOCK_ROLLBACK_KEY_PREFIX = "order:mq:stockRollback:";
+
+    /**
+     * Lua 脚本：校验库存是否充足，充足则扣减库存并返回 1，否则返回 -1
+     */
+    private static final DefaultRedisScript<Long> DEDUCT_STOCK_SCRIPT;
+
+    static {
+        DEDUCT_STOCK_SCRIPT = new DefaultRedisScript<>();
+        DEDUCT_STOCK_SCRIPT.setResultType(Long.class);
+        DEDUCT_STOCK_SCRIPT.setScriptText(
+                "local stock = tonumber(redis.call('GET', KEYS[1]) or '-1')\n" +
+                "local qty = tonumber(ARGV[1])\n" +
+                "if (not qty) or qty <= 0 then\n" +
+                "  return -1\n" +
+                "end\n" +
+                "if stock >= qty then\n" +
+                "  redis.call('DECRBY', KEYS[1], qty)\n" +
+                "  return 1\n" +
+                "end\n" +
+                "return -1"
+        );
+    }
 
     @Value("${order.payment-timeout-seconds:120}")
     private int paymentTimeoutSeconds;
@@ -73,12 +101,16 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
     private int resolvedPaymentTimeoutSeconds() {
         return paymentTimeoutSeconds > 0 ? paymentTimeoutSeconds : DEFAULT_PAYMENT_TIMEOUT_SECONDS;
     }
 
     @Override
     public Result<Void> saveOrder(OrderDto orderDto) {
+        // 1) 参数校验：下单请求的基本合法性检查
         if (orderDto == null) {
             return Result.failure("参数不能为空");
         }
@@ -92,31 +124,21 @@ public class OrderServiceImpl implements OrderService {
             orderDto.setQuantity(1);
         }
 
-        RLock lock = redissonClient.getLock("saveOrder:sku:" + orderDto.getSkuId());
-        boolean locked = false;
+        // 2) 读操作前置：先查 SKU / Product 并做后端价格重算，严禁信任前端价格
         boolean stockDeducted = false;
+        String stockKey = SKU_STOCK_KEY_PREFIX + orderDto.getSkuId();
         try {
-            locked = lock.tryLock(100, TimeUnit.SECONDS);
-            if (!locked) {
-                return Result.failure("系统繁忙，请稍后重试");
-            }
-
             Result<Sku> skuResult = productClient.getSku(orderDto.getSkuId());
             if (skuResult == null || skuResult.getCode() != 200 || skuResult.getData() == null) {
                 return Result.failure(skuResult == null ? "SKU不存在" : skuResult.getMessage());
             }
             Sku sku = skuResult.getData();
 
-            ProductClient.DecreaseSkuStockRequest request = new ProductClient.DecreaseSkuStockRequest();
-            request.skuId = orderDto.getSkuId();
-            request.quantity = orderDto.getQuantity();
-            Result<Void> decreaseResult = productClient.decreaseSkuStock(request);
-            if (decreaseResult == null || decreaseResult.getCode() != 200) {
-                return Result.failure(decreaseResult == null ? "扣减库存失败" : decreaseResult.getMessage());
+            Integer userId = UserContext.getUserId();
+            if (userId == null) {
+                return Result.failure("请先登录");
             }
-            stockDeducted = true;
-
-            orderDto.setUserId(UserContext.getUserId());
+            orderDto.setUserId(userId);
             orderDto.setSkuPrice(sku.getPrice());
             if (sku.getProductId() != null) {
                 orderDto.setProductId(sku.getProductId().intValue());
@@ -124,42 +146,69 @@ public class OrderServiceImpl implements OrderService {
             if (orderDto.getProductId() == null) {
                 throw new IllegalStateException("productId不能为空");
             }
-            // 获取店铺ID用于订单冗余写入（兼容商品服务返回 ProductVo 的扩展字段）
+            // 获取商品信息（包含店铺ID、商品名称等冗余字段）
             Result<ProductClient.ProductDetail> productResult = productClient.getProductById(orderDto.getProductId());
             if (productResult == null || productResult.getCode() != 200 || productResult.getData() == null || productResult.getData().getShopId() == null) {
                 throw new IllegalStateException(productResult == null ? "获取店铺信息失败" : productResult.getMessage());
             }
             orderDto.setShopId(productResult.getData().getShopId());
             orderDto.setProductName(productResult.getData().getName());
-            if (orderDto.getFinalPrice() == null) {
-                BigDecimal couponPrice = orderDto.getCouponPrice() == null ? BigDecimal.ZERO : orderDto.getCouponPrice();
-                BigDecimal finalPrice = sku.getPrice()
-                        .multiply(BigDecimal.valueOf(orderDto.getQuantity()))
-                        .subtract(couponPrice);
-                if (finalPrice.compareTo(BigDecimal.ZERO) < 0) {
-                    finalPrice = BigDecimal.ZERO;
-                }
-                orderDto.setFinalPrice(finalPrice);
-            }
 
-            rabbitTemplate.convertAndSend(MqConstant.SAVE_ORDER_EXCHANGE, "", orderDto);
+            // 后端重算最终价格：单价 * 数量 - 优惠，防止前端篡改
+            BigDecimal couponPrice = orderDto.getCouponPrice() == null ? BigDecimal.ZERO : orderDto.getCouponPrice();
+            if (couponPrice.compareTo(BigDecimal.ZERO) < 0) {
+                couponPrice = BigDecimal.ZERO;
+            }
+            BigDecimal finalPrice = sku.getPrice()
+                    .multiply(BigDecimal.valueOf(orderDto.getQuantity()))
+                    .subtract(couponPrice);
+            if (finalPrice.compareTo(BigDecimal.ZERO) < 0) {
+                finalPrice = BigDecimal.ZERO;
+            }
+            orderDto.setFinalPrice(finalPrice);
+
+            // 3) 使用 Redis Lua 脚本原子预扣库存：避免 Redisson 锁导致的串行瓶颈
+            Long deductResult = stringRedisTemplate.execute(
+                    DEDUCT_STOCK_SCRIPT,
+                    Collections.singletonList(stockKey),
+                    String.valueOf(orderDto.getQuantity())
+            );
+            if (deductResult == null) {
+                return Result.failure("扣减库存失败");
+            }
+            if (deductResult.longValue() != 1L) {
+                return Result.failure("库存不足");
+            }
+            stockDeducted = true;
+
+            // 4) 库存预扣成功后立即发 MQ 异步落库；发送异常时必须回滚 Redis 库存，防止库存泄漏
+            // 用于 MQ 确认失败/路由失败的库存回补（ConfirmCallback/ReturnsCallback 触发）
+            stringRedisTemplate.opsForValue().set(
+                    MQ_STOCK_ROLLBACK_KEY_PREFIX + orderDto.getMessageId(),
+                    orderDto.getSkuId() + "|" + orderDto.getQuantity(),
+                    5,
+                    TimeUnit.MINUTES
+            );
+
+            CorrelationData correlationData = new CorrelationData(orderDto.getMessageId());
+            rabbitTemplate.convertAndSend(MqConstant.SAVE_ORDER_EXCHANGE, "", orderDto, correlationData);
         } catch (Exception e) {
+            log.error("saveOrder failed", e);
             if (stockDeducted) {
                 try {
-                    ProductClient.IncreaseSkuStockRequest rollback = new ProductClient.IncreaseSkuStockRequest();
-                    rollback.skuId = orderDto.getSkuId();
-                    rollback.quantity = orderDto.getQuantity();
-                    productClient.increaseSkuStock(rollback);
+                    // MQ 发送失败或后续异常时，回补 Redis 预扣库存
+                    stringRedisTemplate.opsForValue().increment(stockKey, orderDto.getQuantity());
                 } catch (Exception ex) {
-                    log.error("库存回补失败", ex);
+                    log.error("Redis库存回补失败, skuId={}, quantity={}", orderDto.getSkuId(), orderDto.getQuantity(), ex);
+                }
+                try {
+                    if (StringUtils.hasText(orderDto.getMessageId())) {
+                        stringRedisTemplate.delete(MQ_STOCK_ROLLBACK_KEY_PREFIX + orderDto.getMessageId());
+                    }
+                } catch (Exception ignored) {
                 }
             }
-            log.error("saveOrder failed", e);
             return Result.failure("下单失败");
-        } finally {
-            if (locked && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
         }
 
         return Result.success(null);
@@ -585,13 +634,28 @@ public class OrderServiceImpl implements OrderService {
         if (quantity == null || quantity <= 0) {
             quantity = 1;
         }
+
+        // 1. 订单取消/超时释放预扣库存：回补 Redis 库存，避免库存泄漏
         try {
-            ProductClient.IncreaseSkuStockRequest request = new ProductClient.IncreaseSkuStockRequest();
-            request.skuId = order.getSkuId();
-            request.quantity = quantity;
-            productClient.increaseSkuStock(request);
+            String stockKey = SKU_STOCK_KEY_PREFIX + order.getSkuId();
+            stringRedisTemplate.opsForValue().increment(stockKey, quantity);
         } catch (Exception e) {
-            log.error("取消订单库存回补失败, orderId={}, skuId={}", order.getId(), order.getSkuId(), e);
+            log.error("取消订单-Redis库存回补失败, orderId={}, skuId={}", order.getId(), order.getSkuId(), e);
+        }
+
+        // 2. 同步回补 MySQL 数据库库存
+        try {
+            ProductClient.IncreaseSkuStockRequest stockRequest = new ProductClient.IncreaseSkuStockRequest();
+            stockRequest.skuId = order.getSkuId();
+            stockRequest.quantity = quantity;
+            Result<Void> stockResult = productClient.increaseSkuStock(stockRequest);
+            if (stockResult == null || stockResult.getCode() != 200) {
+                String errorMsg = (stockResult == null) ? "远程调用返回空" : stockResult.getMessage();
+                log.error("取消订单-MySQL库存回补失败: orderId={}, skuId={}, quantity={}, error={}", 
+                        order.getId(), order.getSkuId(), quantity, errorMsg);
+            }
+        } catch (Exception e) {
+            log.error("取消订单-MySQL库存回补异常: orderId={}, skuId={}", order.getId(), order.getSkuId(), e);
         }
     }
 
@@ -621,14 +685,10 @@ public class OrderServiceImpl implements OrderService {
             if (order.getQuantity() == null || order.getQuantity() <= 0) {
                 order.setQuantity(1);
             }
-            if (order.getSkuPrice() == null) {
-                Result<Sku> skuResult = productClient.getSku(order.getSkuId());
-                if (skuResult != null && skuResult.getCode() == 200 && skuResult.getData() != null) {
-                    order.setSkuPrice(skuResult.getData().getPrice());
-                    if (order.getProductId() == null && skuResult.getData().getProductId() != null) {
-                        order.setProductId(skuResult.getData().getProductId().intValue());
-                    }
-                }
+            if (order.getFinalPrice() == null) {
+                // 这属于系统级 Bug（生产者没算价格），必须抛出异常人工介入
+                log.error("严重错误：消费到的订单消息缺失最终价格！MessageId: {}", orderDto.getMessageId());
+                throw new IllegalArgumentException("订单数据异常：缺少成交价");
             }
             if (order.getShopId() == null && order.getProductId() != null) {
                 Result<ProductClient.ProductDetail> productResult = productClient.getProductById(order.getProductId());
@@ -637,21 +697,23 @@ public class OrderServiceImpl implements OrderService {
                     order.setProductName(productResult.getData().getName());
                 }
             }
-            if (order.getFinalPrice() == null && order.getSkuPrice() != null) {
-                BigDecimal couponPrice = orderDto.getCouponPrice() == null ? BigDecimal.ZERO : orderDto.getCouponPrice();
-                BigDecimal finalPrice = order.getSkuPrice()
-                        .multiply(BigDecimal.valueOf(order.getQuantity()))
-                        .subtract(couponPrice);
-                if (finalPrice.compareTo(BigDecimal.ZERO) < 0) {
-                    finalPrice = BigDecimal.ZERO;
-                }
-                order.setFinalPrice(finalPrice);
-            }
 
             order.setStatus(OrderStatusEnum.DUE.getCode());
             order.setCreateTime(LocalDateTime.now().format(DATE_TIME_FORMATTER));
         
             orderMapper.insert(order);
+
+            // 同步扣减MySQL库存
+            ProductClient.DecreaseSkuStockRequest stockRequest = new ProductClient.DecreaseSkuStockRequest();
+            stockRequest.skuId = order.getSkuId();
+            stockRequest.quantity = order.getQuantity();
+            Result<Void> stockResult = productClient.decreaseSkuStock(stockRequest);
+            if (stockResult == null || stockResult.getCode() != 200) {
+                // 如果扣减失败，抛出异常以触发Spring事务回滚和RabbitMQ重试
+                String errorMsg = (stockResult == null) ? "远程调用返回空" : stockResult.getMessage();
+                log.error("MySQL库存扣减失败: skuId={}, quantity={}, error={}", order.getSkuId(), order.getQuantity(), errorMsg);
+                throw new RuntimeException("MySQL库存扣减失败: " + errorMsg);
+            }
 
             if (orderDto.getSelectAttributes() != null && !orderDto.getSelectAttributes().isEmpty()) {
                 for (CustomAttribute attr : orderDto.getSelectAttributes()) {
