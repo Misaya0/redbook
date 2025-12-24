@@ -15,8 +15,13 @@ spring:
     cache-names: noteCache
     caffeine:
       spec: maximumSize=500,expireAfterWrite=5m
+    type: caffeine
   shardingsphere:
     datasource:
+      hikari:
+        connection-test-query: SELECT 1
+        # 可选：避免过于激进的校验
+        validation-timeout: 3000
       names: ds0
       ds0:
         type: com.zaxxer.hikari.HikariDataSource
@@ -79,17 +84,6 @@ spring:
     listener:
       # 自动确认模式，减少处理开销
       ack-mode: RECORD
-  redis:
-    host: 10.1.40.66
-    port: 6379
-#    password: 123321
-    database: 0
-    timeout: 3000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
   data:
     mongodb:
 #      host: 10.1.40.66
@@ -99,6 +93,17 @@ spring:
 #      password: 123321
 #      authentication-database: admin
       uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
+    redis:
+      host: 10.1.40.66
+      port: 6379
+      #    password: 123321
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
   elasticsearch:
     uris: http://10.1.40.66:9200
 oss:

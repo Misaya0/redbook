@@ -1,7 +1,9 @@
 package com.itcast;
 
+import com.itcast.mapper.SkuMapper;
 import com.itcast.model.pojo.CustomAttribute;
 import com.itcast.model.pojo.ProductAttribute;
+import com.itcast.model.pojo.Sku;
 import com.itcast.model.vo.ProductVo;
 import com.itcast.result.Result;
 import com.itcast.service.ProductService;
@@ -10,7 +12,11 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +36,11 @@ class RedbookServiceProductApplicationTests {
     @Autowired
     private ProductService productService;
 
+    @Autowired
+    private SkuMapper skuMapper; // 注入数据库操作接口
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate; // 注入Redis操作工具
     @Test
     void contextLoads() {
     }
@@ -125,6 +136,53 @@ class RedbookServiceProductApplicationTests {
             }
         } else {
             System.out.println("商品不存在");
+        }
+    }
+    private static final String STOCK_PREFIX = "product:stock:";
+    @Test
+    public void syncStockToRedis() {
+        System.out.println("========== 开始同步库存数据到 Redis ==========");
+
+        // 1. 从数据库查询所有 SKU 信息
+        // 如果数据量特别大（比如几十万），建议分批查询，不要一次全查出来
+        List<Sku> skuList = skuMapper.selectList(null);
+
+        if (skuList == null || skuList.isEmpty()) {
+            System.out.println("数据库中没有商品数据，无需同步。");
+            return;
+        }
+
+        System.out.println("查询到 SKU 数量: " + skuList.size());
+
+        // 2. 使用 Pipeline (管道) 批量写入 Redis
+        // Pipeline 的好处是把几千条命令打包发给 Redis，只要一次网络往返，速度极快
+        stringRedisTemplate.executePipelined(new SessionCallback<Object>() {
+            @Override
+            public <K, V> Object execute(RedisOperations<K, V> operations) throws DataAccessException {
+                for (Sku sku : skuList) {
+                    // 构造 Key：product:stock:1001
+                    String key = STOCK_PREFIX + sku.getId();
+
+                    // 获取库存，防止为 null
+                    Integer stock = sku.getStock() == null ? 0 : sku.getStock();
+
+                    // 写入 Redis (String类型)
+                    // operations.opsForValue().set((K) key, (V) String.valueOf(stock));
+                    // 更加稳妥的写法（直接用 stringRedisTemplate 的操作对象）
+                    stringRedisTemplate.opsForValue().set(key, String.valueOf(stock));
+                }
+                // 返回 null 即可
+                return null;
+            }
+        });
+
+        System.out.println("========== 库存同步完成！已写入 Redis ==========");
+
+        // 3. (可选) 随机抽查一个打印出来验证一下
+        if (!skuList.isEmpty()) {
+            Long checkId = skuList.get(0).getId();
+            String redisVal = stringRedisTemplate.opsForValue().get(STOCK_PREFIX + checkId);
+            System.out.println("验证数据 -> SKU ID: " + checkId + ", Redis中库存: " + redisVal);
         }
     }
 }

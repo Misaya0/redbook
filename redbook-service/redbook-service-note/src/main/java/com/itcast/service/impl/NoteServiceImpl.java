@@ -41,12 +41,12 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.itcast.util.LocalFileUtil;
 import com.itcast.constant.MqConstant;
 import com.itcast.model.dto.NoteEsSyncMessage;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.itcast.model.pojo.NoteEs;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -83,7 +83,8 @@ public class NoteServiceImpl implements NoteService {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    private static final Lock lock = new ReentrantLock();
+    @Autowired
+    private RedissonClient redissonClient;
 
     @Autowired
     private CacheManager cacheManager;
@@ -91,54 +92,93 @@ public class NoteServiceImpl implements NoteService {
     @Override
     @SendMessage(type = LogType.SCAN)
     public Result<NoteVo> getNote(Long noteId) throws ParseException {
-        Note note;
-        // 0.查询本地缓存中是否存在缓存
+        Note note = null;
+        int retryCount = 0;
+        int maxRetries = 3; // 最大自旋重试次数
+
+        // 0.查询本地缓存 (Caffeine)
         Cache noteCache = cacheManager.getCache("noteCache");
-        if (noteCache == null) throw new RuntimeException("缓存不存在");
+        if (noteCache == null) throw new RuntimeException("本地缓存组件异常");
+        
         Note localCacheNote = noteCache.get(noteId, Note.class);
         if (localCacheNote != null) {
+            log.info("本地缓存命中: {}", noteId);
             note = localCacheNote;
         } else {
-            // 1.查询redis中是否存在缓存
-            Note cacheNote = (Note) redisTemplate.opsForHash().get(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note");
+            // 1. 本地缓存未命中，进入 Redis + 分布式锁流程
+            // 引入 while 循环实现自旋重试
+            while (retryCount < maxRetries) {
+                // 1.1 查询 Redis 中是否存在缓存
+                Note cacheNote = (Note) redisTemplate.opsForHash().get(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note");
 
-            // 2.如果缓存不存在，则
-            if (cacheNote == null) {
-                boolean locked = false;
+                if (cacheNote != null) {
+                    log.info("Redis缓存命中: {}", noteId);
+                    note = cacheNote;
+                    // 回填本地缓存
+                    noteCache.put(noteId, note);
+                    break; 
+                }
+
+                // 2. 如果 Redis 也不存在，则尝试加锁回源
+                String lockKey = "lock:note:" + noteId;
+                RLock rLock = redissonClient.getLock(lockKey);
                 try {
-                    // 2.1 加锁防止缓存击穿
-                    if (lock.tryLock()) {
-                        log.info("加锁成功");
-                        locked = true;
-                        // 2.2 查询数据库
-                        note = noteMapper.selectById(noteId);
-                        if (note == null) {
-                            redisTemplate.opsForHash().put(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note", new Note());
-                            redisTemplate.expire(RedisConstant.NOTE_DETAIL_CACHE + noteId, 5, TimeUnit.MINUTES);
-                            throw new NoteNoExistException(ExceptionConstant.NOTE_NO_EXIST);
-                        } else {
-                            // 2.3 缓存到redis并设置有效时间
-                            redisTemplate.opsForHash().put(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note", note);
-                            redisTemplate.expire(RedisConstant.NOTE_DETAIL_CACHE + noteId, 5, TimeUnit.MINUTES);
-                            noteCache.put(noteId, note);
+                    // 尝试获取锁，单次等待 1s，自动释放 10s
+                    if (rLock.tryLock(1000, 10000, TimeUnit.MILLISECONDS)) {
+                        try {
+                            log.info("获取分布式锁成功: {}", lockKey);
+                            // 2.2 双重检查：获取锁后再次查询 Redis
+                            cacheNote = (Note) redisTemplate.opsForHash().get(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note");
+                            if (cacheNote != null) {
+                                note = cacheNote;
+                                noteCache.put(noteId, note);
+                            } else {
+                                // 2.3 查询数据库
+                                note = noteMapper.selectById(noteId);
+                                if (note == null) {
+                                    // 缓存穿透处理：数据库查不到则缓存空对象
+                                    Note emptyNote = new Note();
+                                    redisTemplate.opsForHash().put(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note", emptyNote);
+                                    redisTemplate.expire(RedisConstant.NOTE_DETAIL_CACHE + noteId, 5, TimeUnit.MINUTES);
+                                    // 同时同步到本地缓存
+                                    noteCache.put(noteId, emptyNote);
+                                    throw new NoteNoExistException(ExceptionConstant.NOTE_NO_EXIST);
+                                } else {
+                                    // 2.4 缓存到 Redis
+                                    redisTemplate.opsForHash().put(RedisConstant.NOTE_DETAIL_CACHE + noteId, "note", note);
+                                    redisTemplate.expire(RedisConstant.NOTE_DETAIL_CACHE + noteId, 5, TimeUnit.MINUTES);
+                                    // 同时写入本地缓存
+                                    noteCache.put(noteId, note);
+                                }
+                            }
+                            break; 
+                        } finally {
+                            if (rLock.isHeldByCurrentThread()) {
+                                rLock.unlock();
+                            }
                         }
                     } else {
-                        Thread.sleep(50);
-                        return getNote(noteId);
+                        // 获取锁失败，增加重试计数
+                        retryCount++;
+                        log.warn("获取锁超时，正在进行第 {} 次自旋重试: noteId={}", retryCount, noteId);
+                        Thread.sleep(200);
                     }
+                } catch (InterruptedException e) {
+                    log.error("获取分布式锁被中断: {}", e.getMessage());
+                    Thread.currentThread().interrupt();
+                    return Result.failure("服务被中断");
+                } catch (NoteNoExistException e) {
+                    throw e; 
                 } catch (Exception e) {
-                    log.error(e.toString());
+                    log.error("获取笔记详情异常: ", e);
                     return Result.success(null);
-                } finally {
-                    if (locked) {
-                        log.info("释放锁");
-                        lock.unlock();
-                    }
                 }
-            } else {
-                note = cacheNote;
-                noteCache.put(noteId, note);
             }
+        }
+
+        // 如果达到最大重试次数仍未获取到数据
+        if (note == null) {
+            return Result.failure("系统繁忙，请稍后再试");
         }
 
         // 3.获取发布笔记用户信息
@@ -182,15 +222,6 @@ public class NoteServiceImpl implements NoteService {
         Integer loginUserId = UserContext.getUserId();
         bloomFilterUtil.add(RedisConstant.USER_BLOOM_FILTER + loginUserId, noteId.toString());
 
-//        // 7.记录用户访问笔记
-//        try {
-//            NoteBrowse noteBrowse = new NoteBrowse();
-//            noteBrowse.setNoteId(noteId);
-//            noteBrowse.setUserId(loginUserId);
-//            noteScanMapper.insert(noteBrowse);
-//        } catch (Exception e) {
-//            log.error("用户已经访问过，不需要再次插入数据库");
-//        }
         return Result.success(noteVo);
     }
 
