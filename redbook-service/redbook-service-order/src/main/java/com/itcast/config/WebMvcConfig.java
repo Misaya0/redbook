@@ -26,7 +26,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Bean
     public RequestInterceptor requestInterceptor() {
         return template -> {
-            Integer userId = UserContext.getUserId();
+            Long userId = UserContext.getUserId();
             if (userId != null) {
                 template.header("userId", String.valueOf(userId));
             }

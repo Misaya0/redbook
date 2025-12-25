@@ -21,7 +21,7 @@ public class NoteBrowse implements Serializable {
      * 用户id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     /**
      * 浏览时间

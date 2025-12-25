@@ -9,5 +9,5 @@ import java.util.List;
 
 @Mapper
 public interface UserCouponMapper extends BaseMapper<UserCoupon> {
-    List<Coupon> getCouponsByUserId(Integer userId);
+    List<Coupon> getCouponsByUserId(Long userId);
 }

@@ -10,5 +10,5 @@ public class NoteSimpleVo {
     private String title;
     private String image;
     private Integer like;
-    private Integer userId;
+    private Long userId;
 }

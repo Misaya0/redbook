@@ -134,7 +134,7 @@ public class OrderServiceImpl implements OrderService {
             }
             Sku sku = skuResult.getData();
 
-            Integer userId = UserContext.getUserId();
+            Long userId = UserContext.getUserId();
             if (userId == null) {
                 return Result.failure("请先登录");
             }
@@ -216,7 +216,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<Void> buyOrder(Long orderId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -271,7 +271,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<List<OrderVo>> searchOrders(OrderSearchDto searchDto) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -318,7 +318,7 @@ public class OrderServiceImpl implements OrderService {
 
         Map<Integer, com.itcast.model.pojo.Product> productCache = new HashMap<>();
         Map<Integer, ProductClient.Shop> shopCache = new HashMap<>();
-        Map<Integer, User> userCache = new HashMap<>();
+        Map<Long, User> userCache = new HashMap<>();
         List<OrderVo> orderVos = records.stream()
                 .map(order -> buildOrderVo(order, productCache, shopCache, userCache))
                 .collect(Collectors.toList());
@@ -328,7 +328,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<OrderVo> getOrderDetail(Long orderId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -363,7 +363,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<OrderStatisticsVo> getStatistics() {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -423,7 +423,7 @@ public class OrderServiceImpl implements OrderService {
         return Result.success(vo);
     }
     
-    private Long countByStatusForUser(Integer userId, Integer status) {
+    private Long countByStatusForUser(Long userId, Integer status) {
         QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId);
         queryWrapper.eq("status", status);
@@ -432,7 +432,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<Void> updateOrderStatus(Long orderId, Integer status) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -543,7 +543,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result<Void> timeoutCancelOrder(Long orderId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -803,7 +803,7 @@ public class OrderServiceImpl implements OrderService {
 
         Map<Integer, Product> productCache = new HashMap<>();
         Map<Integer, ProductClient.Shop> shopCache = new HashMap<>();
-        Map<Integer, User> userCache = new HashMap<>();
+        Map<Long, User> userCache = new HashMap<>();
         List<OrderVo> orderVos = records.stream()
                 .map(order -> buildOrderVo(order, productCache, shopCache, userCache))
                 .collect(Collectors.toList());
@@ -838,7 +838,7 @@ public class OrderServiceImpl implements OrderService {
         return shopId != null && shopId.equals(merchantShopId);
     }
 
-    private OrderVo buildOrderVo(Order order, Map<Integer, Product> productCache, Map<Integer, ProductClient.Shop> shopCache, Map<Integer, User> userCache) {
+    private OrderVo buildOrderVo(Order order, Map<Integer, Product> productCache, Map<Integer, ProductClient.Shop> shopCache, Map<Long, User> userCache) {
         OrderVo vo = new OrderVo();
         if (order == null) {
             return vo;
@@ -927,7 +927,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 填充买家信息（真实数据）
         if (order.getUserId() != null) {
-            Integer buyerId = order.getUserId();
+            Long buyerId = order.getUserId();
             User buyer = userCache.get(buyerId);
             if (buyer == null) {
                 try {

@@ -41,7 +41,7 @@ public class CollectionServiceImpl implements CollectionService {
 
     @Override
     public Result<Boolean> isCollection(Long noteId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         Boolean isCollection = redisTemplate.opsForValue().getBit(
                 RedisConstant.COLLECTION_SET_CACHE + noteId, userId);
         return Result.success(isCollection);
@@ -49,7 +49,7 @@ public class CollectionServiceImpl implements CollectionService {
 
     @Override
     public Result<Void> collection(Long noteId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         // 1.判断redis中的本用户是否存在这个id
         Boolean isCollection = redisTemplate.opsForValue().getBit(RedisConstant.COLLECTION_SET_CACHE + noteId, userId);
         Note note = noteMapper.selectById(noteId);
@@ -79,8 +79,8 @@ public class CollectionServiceImpl implements CollectionService {
             // 用户收藏，消息发送
             com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
             event.setEventId(java.util.UUID.randomUUID().toString());
-            event.setActorId(userId.longValue());
-            event.setRecipientId(note.getUserId().longValue());
+            event.setActorId(userId);
+            event.setRecipientId(note.getUserId());
             event.setType("COLLECT");
             event.setTargetType("NOTE");
             event.setTargetId(noteId);

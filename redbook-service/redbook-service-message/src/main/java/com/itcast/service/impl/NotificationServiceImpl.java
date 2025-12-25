@@ -71,9 +71,9 @@ public class NotificationServiceImpl implements NotificationService {
         BeanUtils.copyProperties(result, voPage, "records");
         
         // Fetch follow list for batch check
-        Set<Integer> followingIds = new HashSet<>();
+        Set<Long> followingIds = new HashSet<>();
         try {
-            Result<List<AttentionVo>> attentionRes = userClient.getAttention(userId.intValue());
+            Result<List<AttentionVo>> attentionRes = userClient.getAttention(userId);
             if (attentionRes != null && attentionRes.getData() != null) {
                 // Use Gson to convert potentially LinkedHashMap to AttentionVo
                 String json = gson.toJson(attentionRes.getData());
@@ -87,7 +87,7 @@ public class NotificationServiceImpl implements NotificationService {
             log.error("Failed to fetch attention list", e);
         }
         
-        final Set<Integer> finalFollowingIds = followingIds;
+        final Set<Long> finalFollowingIds = followingIds;
 
         List<NotificationVo> vos = result.getRecords().stream().map(n -> {
             NotificationVo vo = new NotificationVo();
@@ -95,7 +95,7 @@ public class NotificationServiceImpl implements NotificationService {
             
             // Fill Follow Status
             if (n.getActorId() != null) {
-                vo.setIsFollowed(finalFollowingIds.contains(n.getActorId().intValue()));
+                vo.setIsFollowed(finalFollowingIds.contains(n.getActorId()));
             } else {
                 vo.setIsFollowed(false);
             }
@@ -103,7 +103,7 @@ public class NotificationServiceImpl implements NotificationService {
             // Fill Actor Info
             try {
                 if (n.getActorId() != null) {
-                    Result<User> userRes = userClient.getUserById(n.getActorId().intValue());
+                    Result<User> userRes = userClient.getUserById(n.getActorId());
                     if (userRes != null && userRes.getData() != null) {
                         vo.setActor(userRes.getData());
                     }
@@ -233,8 +233,7 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         // 3. WS Push
-        // Note: Session uses Integer userId, so we cast.
-        Channel channel = Session.getChannel(userId.intValue());
+        Channel channel = Session.getChannel(userId);
         if (channel != null && channel.isActive()) {
             Map<String, Object> msg = new HashMap<>();
             msg.put("group", group);

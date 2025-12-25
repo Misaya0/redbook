@@ -12,7 +12,7 @@ public class User implements Serializable {
     /**
      * 主键
      */
-    private Integer id;
+    private Long id;
 
     /**
      * 手机号

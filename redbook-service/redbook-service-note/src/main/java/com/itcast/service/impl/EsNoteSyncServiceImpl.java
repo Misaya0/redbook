@@ -112,7 +112,7 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
                     "    \"latitude\":  { \"type\": \"double\" },\n" +
                     "    \"like\":      { \"type\": \"integer\" },\n" +
                     "    \"collection\":{ \"type\": \"integer\" },\n" +
-                    "    \"userId\":    { \"type\": \"integer\" }\n" +
+                    "    \"userId\":    { \"type\": \"long\" }\n" +
                     "  }\n" +
                     "}";
 

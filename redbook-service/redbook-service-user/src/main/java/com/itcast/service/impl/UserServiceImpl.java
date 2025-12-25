@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
     public Result<User> getInfo() throws ParseException {
         // ... (unchanged)
         // 1.获取登录用户信息
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getId, userId);
         User user = userMapper.selectOne(queryWrapper);
@@ -58,13 +58,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Result<User> getUserById(Integer userId) {
+    public Result<User> getUserById(Long userId) {
         log.info("根据id查询用户信息...");
         return Result.success(userMapper.selectById(userId));
     }
 
     @Override
-    public Result<List<User>> getUsersByIds(List<Integer> userIds) {
+    public Result<List<User>> getUsersByIds(List<Long> userIds) {
         // 空参直接返回空集合，避免不必要的数据库查询
         if (userIds == null || userIds.isEmpty()) {
             return Result.success(new ArrayList<>());

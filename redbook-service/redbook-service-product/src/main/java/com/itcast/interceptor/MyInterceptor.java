@@ -34,7 +34,7 @@ public class MyInterceptor implements HandlerInterceptor {
         String userId = request.getHeader("userId");
         if (userId != null) {
             MDC.put("uid", userId);              // ★ 关键：放入 MDC
-            UserContext.setUserId(Integer.valueOf(userId));
+            UserContext.setUserId(Long.valueOf(userId));
             log.info("用户id为：{}", userId);
         } else {
             MDC.put("uid", "anonymous");

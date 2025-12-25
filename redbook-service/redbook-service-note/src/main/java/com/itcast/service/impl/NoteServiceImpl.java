@@ -219,7 +219,7 @@ public class NoteServiceImpl implements NoteService {
 
 
         // 6.加入布隆过滤器
-        Integer loginUserId = UserContext.getUserId();
+        Long loginUserId = UserContext.getUserId();
         bloomFilterUtil.add(RedisConstant.USER_BLOOM_FILTER + loginUserId, noteId.toString());
 
         return Result.success(noteVo);
@@ -278,7 +278,7 @@ public class NoteServiceImpl implements NoteService {
         }
 
         // 2. 权限校验
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (!note.getUserId().equals(userId)) {
             return Result.failure("无权修改此笔记");
         }
@@ -357,7 +357,7 @@ public class NoteServiceImpl implements NoteService {
         }
 
         // 2. 权限校验
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (!note.getUserId().equals(userId)) {
             return Result.failure("无权删除此笔记");
         }
@@ -391,7 +391,7 @@ public class NoteServiceImpl implements NoteService {
             return Result.success(null);
         }
 
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
 
         // 1. 校验所有笔记权限
         List<Note> notes = noteMapper.selectBatchIds(noteIds);
@@ -423,4 +423,3 @@ public class NoteServiceImpl implements NoteService {
         return Result.success(null);
     }
 }
-

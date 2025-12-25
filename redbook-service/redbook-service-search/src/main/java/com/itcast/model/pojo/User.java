@@ -1,10 +1,12 @@
 package com.itcast.model.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class User implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -12,7 +14,7 @@ public class User implements Serializable {
     /**
      * 主键
      */
-    private Integer id;
+    private Long id;
 
     /**
      * 手机号
@@ -63,4 +65,9 @@ public class User implements Serializable {
      * 注册时间
      */
     private String time;
+
+    /**
+     * 角色: 0-普通, 1-商家
+     */
+    private Integer role;
 }

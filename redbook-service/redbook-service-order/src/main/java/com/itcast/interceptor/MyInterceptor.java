@@ -17,7 +17,15 @@ public class MyInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         log.info("前置拦截器");
-        String userId = request.getHeader("userId");
+        Long userId = null;
+        String headerUserId = request.getHeader("userId");
+        if (headerUserId != null) {
+            try {
+                userId = Long.valueOf(headerUserId);
+            } catch (NumberFormatException e) {
+                log.warn("请求头 userId 非法: {}", headerUserId);
+            }
+        }
 
         if (userId == null) {
             String authorization = request.getHeader("Authorization");
@@ -30,7 +38,7 @@ public class MyInterceptor implements HandlerInterceptor {
 
             if (token != null) {
                 try {
-                    userId = JwtUtil.parseToken(token);
+                    userId = Long.valueOf(JwtUtil.parseToken(token));
                 } catch (Exception e) {
                     log.error("解析 token 失败", e);
                 }
@@ -39,7 +47,7 @@ public class MyInterceptor implements HandlerInterceptor {
 
         if (userId != null) {
             log.info("用户id为：{}", userId);
-            UserContext.setUserId(Integer.valueOf(userId));
+            UserContext.setUserId(userId);
         }
         return true;
     }

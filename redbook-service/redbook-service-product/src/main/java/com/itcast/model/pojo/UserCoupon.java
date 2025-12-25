@@ -13,7 +13,7 @@ public class UserCoupon implements Serializable {
      * 用户id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     /**
      * 优惠券id

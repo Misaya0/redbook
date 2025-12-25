@@ -29,5 +29,5 @@ public class Like implements Serializable {
      * 用户id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 }

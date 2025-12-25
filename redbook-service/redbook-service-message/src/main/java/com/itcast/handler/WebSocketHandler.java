@@ -20,7 +20,7 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String token = msg.text();
         if (!StringUtils.isBlank(token)) {
             try {
-                Integer userId = Integer.valueOf(JwtUtil.parseToken(token));
+                Long userId = Long.valueOf(JwtUtil.parseToken(token));
                 Session.bind(userId ,ctx.channel());
                 log.info("用户登录，登录用户的ID为：{}", userId);
             } catch (TokenExpiredException e) {
@@ -32,7 +32,7 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
     @Override
     public void channelInactive(ChannelHandlerContext ctx){
         Channel channel = ctx.channel();
-        Integer userId = Session.getUserId(channel);
+        Long userId = Session.getUserId(channel);
         if(channel != null && userId != null) {
             Session.unbind(userId, ctx.channel());
         }

@@ -13,7 +13,7 @@ import java.io.IOException;
 public class SetUserIdHandler extends NoteHandler {
     @Override
     public void handle(NoteDto noteDto) throws IOException, InterruptedException {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         noteDto.setUserId(userId);
     }
 }

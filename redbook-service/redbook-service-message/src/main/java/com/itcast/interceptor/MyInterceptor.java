@@ -35,7 +35,7 @@ public class MyInterceptor implements HandlerInterceptor {
         // 3. 设置用户id到上下文
         if (userId != null) {
             log.info("用户id为：{}", userId);
-            UserContext.setUserId(Integer.valueOf(userId));
+            UserContext.setUserId(Long.valueOf(userId));
         }
         return true;
     }

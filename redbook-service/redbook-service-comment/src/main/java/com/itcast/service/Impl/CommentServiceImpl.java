@@ -55,7 +55,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public Result<Void> postComment(CommentDto commentDto) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             throw new RuntimeException("获取用户信息失败，请确认是否登录");
         }
@@ -85,14 +85,14 @@ public class CommentServiceImpl implements CommentService {
         try {
             MessageEvent event = new MessageEvent();
             event.setEventId(java.util.UUID.randomUUID().toString());
-            event.setActorId(userId.longValue());
+            event.setActorId(userId);
             event.setTimestamp(System.currentTimeMillis());
             event.setContentBrief(comment.getContent().length() > 50 ? comment.getContent().substring(0, 50) : comment.getContent());
 
             if (comment.getParentId() != null && comment.getParentId() != 0) {
                 // 回复评论
                 if (comment.getTargetUserId() != null && !comment.getTargetUserId().equals(userId)) {
-                    event.setRecipientId(comment.getTargetUserId().longValue());
+                    event.setRecipientId(comment.getTargetUserId());
                     event.setType("REPLY");
                     event.setTargetType("COMMENT");
                     event.setTargetId(comment.getId());
@@ -107,9 +107,9 @@ public class CommentServiceImpl implements CommentService {
                 // 查询笔记作者
                 Result<NoteVo> noteResult = noteClient.getNote(comment.getNoteId());
                 if (noteResult != null && noteResult.getData() != null) {
-                    Integer noteAuthorId = noteResult.getData().getUserId();
+                    Long noteAuthorId = noteResult.getData().getUserId();
                     if (!noteAuthorId.equals(userId)) {
-                        event.setRecipientId(noteAuthorId.longValue());
+                        event.setRecipientId(noteAuthorId);
                         rabbitTemplate.convertAndSend(com.itcast.constant.MqConstant.MESSAGE_NOTICE_EXCHANGE, "note.commented", event);
                         log.info("发送评论笔记消息");
                     }
@@ -128,7 +128,7 @@ public class CommentServiceImpl implements CommentService {
         
         // 获取当前登录用户点赞过的评论ID集合
         Set<Long> likedCommentIds = new HashSet<>();
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId != null) {
             List<CommentLike> likes = commentLikeMapper.selectList(new LambdaQueryWrapper<CommentLike>()
                     .eq(CommentLike::getUserId, userId));
@@ -140,8 +140,8 @@ public class CommentServiceImpl implements CommentService {
                 .eq(Comment::getNoteId, noteId)
                 .orderByDesc(Comment::getId));
 
-        Map<Integer, User> userCache = new HashMap<>();
-        Set<Integer> needQueryUserIds = new HashSet<>();
+        Map<Long, User> userCache = new HashMap<>();
+        Set<Long> needQueryUserIds = new HashSet<>();
         for (Comment comment : commentList) {
             if (comment.getUserId() != null) {
                 needQueryUserIds.add(comment.getUserId());
@@ -150,7 +150,7 @@ public class CommentServiceImpl implements CommentService {
                 needQueryUserIds.add(comment.getTargetUserId());
             }
         }
-        for (Integer needQueryUserId : needQueryUserIds) {
+        for (Long needQueryUserId : needQueryUserIds) {
             try {
                 Result<User> userResult = userClient.getUserById(needQueryUserId);
                 if (userResult != null && userResult.getData() != null) {
@@ -186,7 +186,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public Result<Void> likeComment(Long commentId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             throw new RuntimeException("请先登录");
         }
@@ -218,7 +218,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public Result<Void> unlikeComment(Long commentId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             throw new RuntimeException("请先登录");
         }
@@ -245,7 +245,7 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds, Map<Integer, User> userCache) throws ParseException {
+    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds, Map<Long, User> userCache) throws ParseException {
         String dealTime = "";
         try {
              dealTime = DealTimeUtil.dealTime(
@@ -292,7 +292,7 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds, Map<Integer, User> userCache) throws ParseException {
+    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds, Map<Long, User> userCache) throws ParseException {
         List<CommentVo> childrenVoList = new ArrayList<>();
         for (Comment comment : commentList) {
             if (parentId.equals(comment.getParentId())) {

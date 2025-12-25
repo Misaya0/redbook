@@ -44,7 +44,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 // 调用用户服务获取目标用户信息
                 Long talkerId = conversation.getTalkerId();
                 if (talkerId != null) {
-                    Result<User> userResult = userClient.getUserById(talkerId.intValue());
+                    Result<User> userResult = userClient.getUserById(talkerId);
                     if (userResult != null && userResult.getData() != null) {
                         User user = userResult.getData();
                         vo.setTargetName(user.getNickname()); // 使用 nickname 作为显示名称

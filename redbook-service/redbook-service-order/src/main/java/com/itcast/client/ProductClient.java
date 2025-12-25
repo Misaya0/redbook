@@ -45,7 +45,7 @@ public interface ProductClient {
     Result<Shop> getMyShop();
 
     @GetMapping("/shop/getShopByUserId/{userId}")
-    Result<Shop> getShopByUserId(@PathVariable("userId") Integer userId);
+    Result<Shop> getShopByUserId(@PathVariable("userId") Long userId);
 
     @GetMapping("/shop/getShopById/{shopId}")
     Result<Shop> getShopById(@PathVariable("shopId") Integer shopId);
@@ -92,7 +92,7 @@ public interface ProductClient {
         public String time;
         public Integer fans;
         public Integer sales;
-        public Integer userId;
+        public Long userId;
         public Integer linkAuthMode;
     }
 }

@@ -10,6 +10,6 @@ public class OrderSearchDto {
     private String startTime;
     private String endTime;
     private Long orderId;
-    private Integer userId;
+    private Long userId;
     private String keyword;
 }

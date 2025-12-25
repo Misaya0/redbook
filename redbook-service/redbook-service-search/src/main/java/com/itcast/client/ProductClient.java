@@ -16,7 +16,9 @@ public interface ProductClient {
     Result<List<Product>> search(
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "minPrice", required = false) Double minPrice,
-            @RequestParam(value = "maxPrice", required = false) Double maxPrice
+            @RequestParam(value = "maxPrice", required = false) Double maxPrice,
+            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "10") Integer size
     );
 
     @GetMapping("/product/getProductList")

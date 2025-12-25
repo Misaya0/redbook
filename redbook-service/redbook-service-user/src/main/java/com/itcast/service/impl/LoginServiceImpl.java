@@ -60,7 +60,7 @@ public class LoginServiceImpl implements LoginService {
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getPhone, loginDto.getPhone());
         User dbUser = userMapper.selectOne(queryWrapper);
-        Integer userId;
+        Long userId;
         Integer role = 0;
         
         // 5.判断用户是否存在

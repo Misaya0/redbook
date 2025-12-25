@@ -11,7 +11,7 @@ public class AttentionVo implements Serializable {
     /**
      * 用户id
      */
-    private Integer userId;
+    private Long userId;
 
     /**
      * 用户昵称

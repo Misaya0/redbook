@@ -18,17 +18,17 @@ public interface UserClient {
      * 单个查询用户信息
      */
     @GetMapping("/user/getUserById/{userId}")
-    Result<User> getUserById(@PathVariable("userId") Integer userId);
+    Result<User> getUserById(@PathVariable("userId") Long userId);
 
     /**
      * 批量查询用户信息：用于避免 N+1 远程调用
      */
     @PostMapping("/user/getUsersByIds")
-    Result<List<User>> getUsersByIds(@RequestBody List<Integer> userIds);
+    Result<List<User>> getUsersByIds(@RequestBody List<Long> userIds);
 
     /**
      * 获取关注列表
      */
     @GetMapping("/user/getAttention/{userId}")
-    Result<List<AttentionVo>> getAttention(@PathVariable("userId") Integer userId);
+    Result<List<AttentionVo>> getAttention(@PathVariable("userId") Long userId);
 }

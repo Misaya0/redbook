@@ -23,13 +23,13 @@ public class Attention implements Serializable {
      * 被关注者id
      */
     @TableField("other_id")
-    private Integer otherId;
+    private Long otherId;
 
     /**
      * 关注者id
      */
     @TableField("own_id")
-    private Integer ownId;
+    private Long ownId;
 
     /**
      * 关注时间

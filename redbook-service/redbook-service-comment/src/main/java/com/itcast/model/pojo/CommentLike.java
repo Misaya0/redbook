@@ -17,7 +17,7 @@ public class CommentLike implements Serializable {
     private Long id;
 
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     @TableField("comment_id")
     private Long commentId;

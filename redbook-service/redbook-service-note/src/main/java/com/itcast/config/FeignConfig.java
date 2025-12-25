@@ -19,7 +19,7 @@ public class FeignConfig {
     public RequestInterceptor requestInterceptor() {
         return template -> {
             // 从 UserContext 中获取当前用户 ID
-            Integer userId = UserContext.getUserId();
+            Long userId = UserContext.getUserId();
             if (userId != null) {
                 // 将 userId 添加到请求头中
                 template.header("userId", String.valueOf(userId));

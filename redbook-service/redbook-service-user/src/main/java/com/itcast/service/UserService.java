@@ -11,12 +11,12 @@ import java.util.List;
 public interface UserService {
     Result<User> getInfo() throws ParseException;
 
-    Result<User> getUserById(Integer userId);
+    Result<User> getUserById(Long userId);
 
     /**
      * 批量查询用户信息：用于下游服务一次性回填用户信息，避免 N+1 远程调用
      */
-    Result<List<User>> getUsersByIds(List<Integer> userIds);
+    Result<List<User>> getUsersByIds(List<Long> userIds);
 
     Result<Void> updateImage(MultipartFile file) throws IOException;
 

@@ -22,7 +22,7 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public Result<Void> createShop(Shop shop) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -50,7 +50,7 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public Result<Shop> getMyShop() {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             return Result.failure("请先登录");
         }
@@ -58,7 +58,7 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
-    public Result<Shop> getShopByUserId(Integer userId) {
+    public Result<Shop> getShopByUserId(Long userId) {
         LambdaQueryWrapper<Shop> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Shop::getUserId, userId);
         Shop shop = shopMapper.selectOne(queryWrapper);

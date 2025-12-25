@@ -22,7 +22,7 @@ public interface ShopService {
      * @param userId 用户ID
      * @return 店铺信息
      */
-    Result<Shop> getShopByUserId(Integer userId);
+    Result<Shop> getShopByUserId(Long userId);
 
     Result<Shop> getShopById(Integer shopId);
 }

@@ -22,7 +22,7 @@ public class MybatisPlusConfig {
     @Bean
     public RequestInterceptor userIdRequestInterceptor() {
         return template -> {
-            Integer userId = UserContext.getUserId();
+            Long userId = UserContext.getUserId();
             if (userId != null) {
                 template.header("userId", String.valueOf(userId));
             }

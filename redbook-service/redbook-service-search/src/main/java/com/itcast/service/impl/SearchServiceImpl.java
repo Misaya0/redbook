@@ -36,17 +36,20 @@ import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class SearchServiceImpl implements SearchService {
+
+    private static final Gson GSON = new Gson();
 
     @Autowired
     private RestHighLevelClient client;
@@ -73,37 +76,121 @@ public class SearchServiceImpl implements SearchService {
         // 2.多字段查询
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         sourceBuilder.query(QueryBuilders.multiMatchQuery(key, "title", "content"));
+        
+        // 添加高亮
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        highlightBuilder.field("title").field("content");
+        highlightBuilder.preTags("<span style='color:red'>").postTags("</span>");
+        sourceBuilder.highlighter(highlightBuilder);
+        
         request.source(sourceBuilder);
         // 3.获取结果
         SearchResponse response = client.search(request, RequestOptions.DEFAULT);
         SearchHit[] hits = response.getHits().getHits();
-        // 4.设置vo
-        List<NoteVo> noteVos = new ArrayList<>();
-        for (SearchHit hit : hits) {
-            String source = hit.getSourceAsString();
-            // 4.1 解析JSON
-            Note note = new Gson().fromJson(source, Note.class);
-            // 4.2 设置vo
-            NoteVo noteVo = new NoteVo();
-            BeanUtils.copyProperties(note, noteVo);
-            noteVo.setUser(userClient.getUserById(note.getUserId()).getData());
-            noteVos.add(noteVo);
-        }
-
-
+        
+        // 4.解析结果并填充用户信息
+        List<NoteVo> noteVos = fillNoteVoList(hits);
 
         // 5.保存搜索记录
-        try {
-            History history = new History();
-            history.setHistory(key);
-            history.setUserId(UserContext.getUserId());
-            historyMapper.insert(history);
-        } catch (Exception e) {
-            log.info("用户搜索重复");
-        }
+        saveSearchHistory(key);
+        
         // 6.保存热度
         redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, key, 1);
         return Result.success(noteVos);
+    }
+
+    /**
+     * 保存搜索历史记录
+     */
+    private void saveSearchHistory(String keyword) {
+        if (StringUtils.isBlank(keyword)) {
+            return;
+        }
+        // 注意：UserContext 基于 ThreadLocal，异步线程无法直接获取用户ID，因此这里需要提前捕获
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                History history = new History();
+                history.setHistory(keyword);
+                history.setUserId(userId);
+                historyMapper.insert(history);
+            } catch (DuplicateKeyException e) {
+                // 数据库唯一索引冲突（重复搜索记录）属于正常情况，记录日志即可，不影响主流程
+                log.info("用户搜索历史重复，忽略写入 userId:{} keyword:{}", userId, keyword);
+            } catch (Exception e) {
+                // 捕获所有异常，避免影响搜索主流程
+                log.warn("用户搜索历史写入失败 userId:{} keyword:{}", userId, keyword, e);
+            }
+        });
+    }
+
+    /**
+     * 解析 Note 搜索结果并批量填充用户信息
+     */
+    private List<NoteVo> fillNoteVoList(SearchHit[] hits) {
+        if (hits == null || hits.length == 0) {
+            return new ArrayList<>();
+        }
+
+        List<NoteVo> noteVos = new ArrayList<>();
+        List<Long> userIds = new ArrayList<>();
+
+        for (SearchHit hit : hits) {
+            String source = hit.getSourceAsString();
+            // 1. 解析JSON
+            Note note = GSON.fromJson(source, Note.class);
+
+            // 2. 处理高亮
+            Map<String, HighlightField> highlightFields = hit.getHighlightFields();
+            if (highlightFields != null) {
+                if (highlightFields.containsKey("title")) {
+                    note.setTitle(Arrays.stream(highlightFields.get("title").fragments())
+                            .map(Text::string)
+                            .collect(Collectors.joining()));
+                }
+                if (highlightFields.containsKey("content")) {
+                    note.setContent(Arrays.stream(highlightFields.get("content").fragments())
+                            .map(Text::string)
+                            .collect(Collectors.joining()));
+                }
+            }
+
+            // 3. 转换为 VO
+            NoteVo noteVo = new NoteVo();
+            BeanUtils.copyProperties(note, noteVo);
+            noteVos.add(noteVo);
+            
+            // 4. 收集用户ID用于批量查询
+            if (note.getUserId() != null) {
+                userIds.add(note.getUserId());
+            }
+        }
+
+        // 5. 批量查询用户信息并填充
+        if (!userIds.isEmpty()) {
+            try {
+                // 去重
+                List<Long> distinctUserIds = userIds.stream().distinct().collect(Collectors.toList());
+                Result<List<User>> usersResult = userClient.getUsersByIds(distinctUserIds);
+                if (usersResult != null && usersResult.getData() != null) {
+                    Map<Long, User> userMap = usersResult.getData().stream()
+                            .collect(Collectors.toMap(User::getId, u -> u, (k1, k2) -> k1));
+                    
+                    for (NoteVo vo : noteVos) {
+                        if (vo.getUserId() != null) {
+                            vo.setUser(userMap.get(vo.getUserId()));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("批量获取用户信息失败", e);
+            }
+        }
+
+        return noteVos;
     }
 
     @Override
@@ -157,15 +244,13 @@ public class SearchServiceImpl implements SearchService {
         List<Product> productList = new ArrayList<>();
         for (SearchHit hit : hits) {
             String source = hit.getSourceAsString();
-            Product product = new Gson().fromJson(source, Product.class);
+            Product product = GSON.fromJson(source, Product.class);
             
             // Handle highlight
             Map<String, HighlightField> highlightFields = hit.getHighlightFields();
             if (highlightFields.containsKey("name")) {
-                Text[] fragments = highlightFields.get("name").fragments();
-                StringBuilder name = new StringBuilder();
-                for (Text text : fragments) name.append(text);
-                product.setName(name.toString());
+                product.setName(Arrays.stream(highlightFields.get("name").fragments())
+                        .map(Text::string).collect(Collectors.joining()));
             }
             
             productList.add(product);
@@ -181,26 +266,14 @@ public class SearchServiceImpl implements SearchService {
         if (size == null || size < 1) size = 10;
 
         if (type == 1) { // User
-            List<User> users = userMapper.searchUsers(keyword);
-            if (users == null) users = new ArrayList<>();
-            int fromIndex = (page - 1) * size;
-            if (fromIndex >= users.size()) {
-                return Result.success(new ArrayList<>());
-            }
-            int toIndex = Math.min(fromIndex + size, users.size());
-            return Result.success(users.subList(fromIndex, toIndex));
+            int offset = (page - 1) * size;
+            List<User> users = userMapper.searchUsers(keyword, offset, size);
+            return Result.success(users == null ? new ArrayList<>() : users);
 
         } else if (type == 2) { // Product
-            Result<List<Product>> result = productClient.search(keyword, null, null);
-            List<Product> products = result.getData();
-            if (products == null) products = new ArrayList<>();
-
-            int fromIndex = (page - 1) * size;
-            if (fromIndex >= products.size()) {
-                return Result.success(new ArrayList<>());
-            }
-            int toIndex = Math.min(fromIndex + size, products.size());
-            return Result.success(products.subList(fromIndex, toIndex));
+            Result<List<Product>> result = productClient.search(keyword, null, null, page, size);
+            List<Product> products = result == null ? null : result.getData();
+            return Result.success(products == null ? new ArrayList<>() : products);
 
         } else { // Note (ES)
             SearchRequest request = new SearchRequest("rb_note");
@@ -220,48 +293,10 @@ public class SearchServiceImpl implements SearchService {
             SearchResponse response = client.search(request, RequestOptions.DEFAULT);
             SearchHit[] hits = response.getHits().getHits();
 
-            List<NoteVo> noteVos = new ArrayList<>();
-            for (SearchHit hit : hits) {
-                String source = hit.getSourceAsString();
-                Note note = new Gson().fromJson(source, Note.class);
+            List<NoteVo> noteVos = fillNoteVoList(hits);
 
-                // Highlight handling
-                Map<String, HighlightField> highlightFields = hit.getHighlightFields();
-                if (highlightFields.containsKey("title")) {
-                    Text[] fragments = highlightFields.get("title").fragments();
-                    StringBuilder title = new StringBuilder();
-                    for (Text text : fragments) title.append(text);
-                    note.setTitle(title.toString());
-                }
-                if (highlightFields.containsKey("content")) {
-                    Text[] fragments = highlightFields.get("content").fragments();
-                    StringBuilder content = new StringBuilder();
-                    for (Text text : fragments) content.append(text);
-                    note.setContent(content.toString());
-                }
-
-                NoteVo noteVo = new NoteVo();
-                BeanUtils.copyProperties(note, noteVo);
-                try {
-                    Result<User> userResult = userClient.getUserById(note.getUserId());
-                    if (userResult != null && userResult.getData() != null) {
-                        noteVo.setUser(userResult.getData());
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to get user info for note", e);
-                }
-                noteVos.add(noteVo);
-            }
-            
-            try {
-                History history = new History();
-                history.setHistory(keyword);
-                history.setUserId(UserContext.getUserId());
-                historyMapper.insert(history);
-                redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, keyword, 1);
-            } catch (Exception e) {
-                // ignore
-            }
+            saveSearchHistory(keyword);
+            redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, keyword, 1);
 
             return Result.success(noteVos);
         }
@@ -296,7 +331,6 @@ public class SearchServiceImpl implements SearchService {
     public Result<Void> syncAllProductsToEs() throws IOException {
         int pageNum = 1;
         int pageSize = 200;
-        Gson gson = new Gson();
 
         while (true) {
             Result<List<ProductEsDTO>> result = productClient.getProductEsList(pageNum, pageSize);
@@ -311,7 +345,7 @@ public class SearchServiceImpl implements SearchService {
                     continue;
                 }
                 IndexRequest indexRequest = new IndexRequest("rb_product").id(dto.getId().toString());
-                indexRequest.source(gson.toJson(dto), XContentType.JSON);
+                indexRequest.source(GSON.toJson(dto), XContentType.JSON);
                 bulkRequest.add(indexRequest);
             }
 

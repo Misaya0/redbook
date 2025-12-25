@@ -42,7 +42,7 @@ public class GetNoteListByCollection implements GetNotesStrategy {
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
         // 1.获取用户收藏
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         LambdaQueryWrapper<Collection> queryWrapper
                 = new LambdaQueryWrapper<Collection>().eq(Collection::getUserId, userId);
         List<Collection> collectionList = collectionMapper.selectList(queryWrapper);

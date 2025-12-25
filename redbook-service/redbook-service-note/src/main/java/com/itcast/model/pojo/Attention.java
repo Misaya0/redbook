@@ -16,12 +16,12 @@ public class Attention implements Serializable {
     /**
      * 被关注者id
      */
-    private Integer otherId;
+    private Long otherId;
 
     /**
      * 关注者id
      */
-    private Integer ownId;
+    private Long ownId;
 
     /**
      * 关注时间

@@ -57,7 +57,7 @@ public class Order {
      * 订单归属人ID
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     /**
      * 状态

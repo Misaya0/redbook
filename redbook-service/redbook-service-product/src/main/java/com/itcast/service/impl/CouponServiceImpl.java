@@ -35,7 +35,7 @@ public class CouponServiceImpl implements CouponService {
     @Override
     public Result<List<CouponVo>> getCouponsByUserId() {
         // 1.获取登录用户id
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
 
         // 2.根据用户id查找到用户可用的优惠券
         List<Coupon> couponsByUserId = userCouponMapper.getCouponsByUserId(userId);

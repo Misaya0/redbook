@@ -34,7 +34,7 @@ public class GetNoteListByOwn implements GetNotesStrategy {
 
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         LambdaQueryWrapper<Note> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Note::getUserId, userId);
         List<Note> noteList = noteMapper.selectList(queryWrapper);

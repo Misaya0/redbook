@@ -66,5 +66,5 @@ public class Note implements Serializable {
     /**
      * 发布人id
      */
-    private Integer userId;
+    private Long userId;
 }

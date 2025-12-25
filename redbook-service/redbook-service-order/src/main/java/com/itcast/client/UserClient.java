@@ -20,6 +20,5 @@ public interface UserClient {
      * @return 用户信息
      */
     @GetMapping("/user/getUserById/{userId}")
-    Result<User> getUserById(@PathVariable("userId") Integer userId);
+    Result<User> getUserById(@PathVariable("userId") Long userId);
 }
-

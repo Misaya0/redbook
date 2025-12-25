@@ -13,11 +13,11 @@ import java.util.List;
 public interface UserClient {
 
     @GetMapping("/user/getUserById/{userId}")
-    Result<User> getUserById(@PathVariable("userId") Integer userId);
+    Result<User> getUserById(@PathVariable("userId") Long userId);
 
     @GetMapping("/user/getAttention/{userId}")
-    Result<List<AttentionVo>> getAttention(@PathVariable("userId") Integer userId);
+    Result<List<AttentionVo>> getAttention(@PathVariable("userId") Long userId);
 
     @GetMapping("/user/isAttention/{otherId}")
-    Result<Integer> isAttention(@PathVariable("otherId") Integer otherId);
+    Result<Integer> isAttention(@PathVariable("otherId") Long otherId);
 }

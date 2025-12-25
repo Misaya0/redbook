@@ -29,8 +29,7 @@ public class ChatController {
     @Operation(summary = "获取会话列表", description = "获取当前用户的会话列表")
     @GetMapping("/conversation/list")
     public Result<List<ConversationVo>> getConversationList() {
-        Integer userIdInt = UserContext.getUserId();
-        Long userId = userIdInt != null ? userIdInt.longValue() : null;
+        Long userId = UserContext.getUserId();
         return Result.success(conversationService.getConversationList(userId));
     }
 
@@ -38,8 +37,7 @@ public class ChatController {
     @GetMapping("/history")
     public Result<List<ChatMessage>> getHistory(
             @Parameter(description = "聊天对象ID", required = true) @RequestParam Long talkerId) {
-        Integer userIdInt = UserContext.getUserId();
-        Long userId = userIdInt != null ? userIdInt.longValue() : null;
+        Long userId = UserContext.getUserId();
         return Result.success(chatMessageService.getHistory(userId, talkerId));
     }
 
@@ -47,8 +45,7 @@ public class ChatController {
     @PostMapping("/conversation/read")
     public Result<Void> markAsRead(
             @Parameter(description = "聊天对象ID", required = true) @RequestParam Long talkerId) {
-        Integer userIdInt = UserContext.getUserId();
-        Long userId = userIdInt != null ? userIdInt.longValue() : null;
+        Long userId = UserContext.getUserId();
         conversationService.clearUnreadCount(userId, talkerId);
         return Result.success(null);
     }
@@ -59,8 +56,7 @@ public class ChatController {
             @Parameter(description = "接收者ID", required = true) @RequestParam Long receiverId,
             @Parameter(description = "消息内容", required = true) @RequestParam String content,
             @Parameter(description = "消息类型(0:文本,1:图片)", required = false) @RequestParam(defaultValue = "0") Integer type) {
-        Integer userIdInt = UserContext.getUserId();
-        Long userId = userIdInt != null ? userIdInt.longValue() : null;
+        Long userId = UserContext.getUserId();
         return Result.success(chatMessageService.sendMessage(userId, receiverId, content, type));
     }
 }

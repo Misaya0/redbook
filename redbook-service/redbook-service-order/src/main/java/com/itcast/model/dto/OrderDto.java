@@ -68,7 +68,7 @@ public class OrderDto implements Serializable {
     /**
      * 用户ID
      */
-    private Integer userId;
+    private Long userId;
 
     /**
      * 商品名称（冗余）

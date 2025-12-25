@@ -16,12 +16,16 @@ public class JwtUtil {
      * @param userId
      * @return
      */
-    public static String createToken(Integer userId) {
+    public static String createToken(Long userId) {
         Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
         return JWT.create()
                 .withSubject(String.valueOf(userId))
                 .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRE_TIME))
                 .sign(algorithm);
+    }
+
+    public static String createToken(Integer userId) {
+        return createToken(userId == null ? null : userId.longValue());
     }
 
     /**

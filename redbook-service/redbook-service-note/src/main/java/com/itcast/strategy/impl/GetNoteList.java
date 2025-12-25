@@ -67,7 +67,7 @@ public class GetNoteList implements GetNotesStrategy {
         queryWrapper.orderByDesc(Note::getTime).orderByDesc(Note::getId);
 
         // 登录用户ID：用于布隆过滤；未登录则不做过滤（全部视为未读）
-        Integer loginUserId = UserContext.getUserId();
+        Long loginUserId = UserContext.getUserId();
 
         // selectedNotes：最终选中的笔记集合，目标尽量补齐到 pageSize
         List<Note> selectedNotes = new ArrayList<>(pageSize);
@@ -122,7 +122,7 @@ public class GetNoteList implements GetNotesStrategy {
         }
 
         // 批量填充用户信息：避免对每条 Note 进行 N+1 远程调用
-        Map<Integer, User> userMap = getUserMap(selectedNotes);
+        Map<Long, User> userMap = getUserMap(selectedNotes);
         List<NoteVo> noteVoList = selectedNotes.stream()
                 .limit(pageSize)
                 .map(note -> {
@@ -145,8 +145,8 @@ public class GetNoteList implements GetNotesStrategy {
      * 1) 单次请求尽量只调用一次用户服务批量接口；
      * 2) 远程调用失败时不中断流程，返回空 Map（noteVo.user 允许为空）。
      */
-    private Map<Integer, User> getUserMap(List<Note> notes) {
-        List<Integer> userIds = notes.stream()
+    private Map<Long, User> getUserMap(List<Note> notes) {
+        List<Long> userIds = notes.stream()
                 .map(Note::getUserId)
                 .filter(Objects::nonNull)
                 .distinct()

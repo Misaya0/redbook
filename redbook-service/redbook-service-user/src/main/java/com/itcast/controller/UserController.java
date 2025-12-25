@@ -31,17 +31,18 @@ public class UserController {
     @Operation(summary = "根据ID查询用户信息", description = "传入用户ID，返回用户详情数据")
     @GetMapping("/getUserById/{userId}")
     public Result<User> getUserById(
-            @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
+            @Parameter(description = "用户ID", required = true) @PathVariable("userId") Long userId) {
         return userService.getUserById(userId);
     }
 
     @Operation(summary = "批量查询用户信息", description = "根据用户ID列表批量查询用户详情数据")
     @PostMapping("/getUsersByIds")
     public Result<List<User>> getUsersByIds(
-            @Parameter(description = "用户ID列表", required = true) @RequestBody List<Integer> userIds) {
+            @Parameter(description = "用户ID列表", required = true) @RequestBody List<Long> userIds) {
         // 用于下游服务批量回填用户信息，避免 N+1 远程调用
         return userService.getUsersByIds(userIds);
     }
+
 
     @Operation(summary = "更新用户头像", description = "上传用户头像图片文件")
     @PostMapping("/updateImage")

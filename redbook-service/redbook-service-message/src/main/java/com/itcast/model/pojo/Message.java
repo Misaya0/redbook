@@ -14,7 +14,7 @@ public class Message<T> implements Serializable {
     /**
      * 通知对象ID
      */
-    private Integer noticeId;
+    private Long noticeId;
 
     /**
      * 消息对象

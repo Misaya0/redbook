@@ -37,7 +37,7 @@ public class GetNoteListByAttention implements GetNotesStrategy {
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
         // 1.获取登录用户id
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         // 2.获取该用户关注的人
         List<AttentionVo> attentions = userClient.getAttention(userId).getData();
         // 3.获取该用户关注的人的笔记

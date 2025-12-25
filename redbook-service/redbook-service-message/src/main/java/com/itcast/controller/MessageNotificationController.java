@@ -61,12 +61,12 @@ public class MessageNotificationController {
     }
 
     private Long getCurrentUserId() {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         if (userId == null) {
             // For robust handling, but existing interceptors should handle this.
             // Returning null or throwing might depend on global handler.
             throw new RuntimeException("User not logged in");
         }
-        return userId.longValue();
+        return userId;
     }
 }

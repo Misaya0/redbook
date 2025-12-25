@@ -82,5 +82,5 @@ public class Note implements Serializable {
      * 发布人id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 }

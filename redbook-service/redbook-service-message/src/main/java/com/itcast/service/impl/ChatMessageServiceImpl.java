@@ -59,7 +59,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         updateReceiverConversation(senderId, receiverId, content);
 
         // 4. 如果接收方在线，则实时推送消息
-        Channel channel = getChannel(receiverId.intValue());
+        Channel channel = getChannel(receiverId);
         if (channel != null && channel.isActive()) {
             try {
                 String json = objectMapper.writeValueAsString(message);

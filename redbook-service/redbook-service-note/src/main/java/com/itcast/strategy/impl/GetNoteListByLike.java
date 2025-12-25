@@ -42,7 +42,7 @@ public class GetNoteListByLike implements GetNotesStrategy {
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
         // 1.获取用户收藏
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         LambdaQueryWrapper<Like> queryWrapper
                 = new LambdaQueryWrapper<Like>().eq(Like::getUserId, userId);
         List<Like> likeList = likeMapper.selectList(queryWrapper);

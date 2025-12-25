@@ -37,7 +37,7 @@ public class SendMessageAspect {
     public void afterReturning(JoinPoint joinPoint) {
         Object[] args = joinPoint.getArgs();
         Long noteId = (Long) args[0];
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
 
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();

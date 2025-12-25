@@ -33,7 +33,7 @@ public class ShopController {
     @Operation(summary = "根据用户ID获取店铺", description = "获取指定用户的店铺信息")
     @GetMapping("/getShopByUserId/{userId}")
     public Result<Shop> getShopByUserId(
-            @Parameter(description = "用户ID", required = true) @PathVariable("userId") Integer userId) {
+            @Parameter(description = "用户ID", required = true) @PathVariable("userId") Long userId) {
         return shopService.getShopByUserId(userId);
     }
 

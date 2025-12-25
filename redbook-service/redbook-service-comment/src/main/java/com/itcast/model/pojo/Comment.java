@@ -45,13 +45,13 @@ public class Comment implements Serializable {
      * 用户id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     /**
      * 回复目标用户id
      */
     @TableField("target_user_id")
-    private Integer targetUserId;
+    private Long targetUserId;
 
     /**
      * 点赞数

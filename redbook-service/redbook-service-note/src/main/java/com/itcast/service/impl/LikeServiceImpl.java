@@ -46,7 +46,7 @@ public class LikeServiceImpl implements LikeService {
     @Override
     @SendMessage(type = LogType.LIKE)
     public Result<Void> like(Long noteId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
 
         Note note = noteMapper.selectById(noteId);
         if (note == null) {
@@ -83,8 +83,8 @@ public class LikeServiceImpl implements LikeService {
             // 用户点赞，消息发送
             com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
             event.setEventId(java.util.UUID.randomUUID().toString());
-            event.setActorId(userId.longValue());
-            event.setRecipientId(note.getUserId().longValue());
+            event.setActorId(userId);
+            event.setRecipientId(note.getUserId());
             event.setType("LIKE");
             event.setTargetType("NOTE");
             event.setTargetId(noteId);
@@ -107,7 +107,7 @@ public class LikeServiceImpl implements LikeService {
 
     @Override
     public Result<Boolean> isLike(Long noteId) {
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         Boolean isLike = redisTemplate.opsForValue().getBit(
                 RedisConstant.LIKE_SET_CACHE + noteId, userId);
         return Result.success(isLike);

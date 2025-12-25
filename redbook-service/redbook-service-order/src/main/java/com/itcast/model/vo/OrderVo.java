@@ -14,7 +14,7 @@ public class OrderVo {
     private BigDecimal skuPrice;
     private Integer couponId;
     private BigDecimal finalPrice;
-    private Integer userId;
+    private Long userId;
     private Integer status;
     private String createTime;
 

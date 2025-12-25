@@ -30,7 +30,7 @@ CREATE TABLE `rb_comment` (
   `time` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '时间',
   `parent_id` bigint(20) DEFAULT '0' COMMENT '父id',
   `note_id` bigint(20) DEFAULT NULL COMMENT '笔记id',
-  `user_id` int(11) DEFAULT NULL COMMENT '用户id',
+  `user_id` bigint(20) DEFAULT NULL COMMENT '用户id',
   PRIMARY KEY (`id`) USING BTREE,
   KEY `idx_note_id` (`note_id`),
   KEY `idx_parent_id` (`parent_id`)
@@ -39,5 +39,5 @@ CREATE TABLE `rb_comment` (
 SET FOREIGN_KEY_CHECKS = 1;
 
 
-ALTER TABLE `rb_comment` ADD COLUMN `target_user_id` int(11) DEFAULT NULL COMMENT '回复目标用户id';
+ALTER TABLE `rb_comment` ADD COLUMN `target_user_id` bigint(20) DEFAULT NULL COMMENT '回复目标用户id';
 ALTER TABLE `rb_comment` ADD COLUMN `like_count` int(11) DEFAULT 0 COMMENT '点赞数';

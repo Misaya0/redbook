@@ -16,13 +16,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         log.info("注册自定义拦截器");
         registry.addInterceptor(new MyInterceptor())
-                .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/user/send/**",
-                        "/user/verify",
-                        "/search/all",
-                        "/search/suggest",
-                        "/search/search/**"
-                );
+                .addPathPatterns("/**");
     }
 }

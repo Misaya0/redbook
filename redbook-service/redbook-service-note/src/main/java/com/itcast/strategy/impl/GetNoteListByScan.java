@@ -42,7 +42,7 @@ public class GetNoteListByScan implements GetNotesStrategy {
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyContext context) {
         // 1.获取登录用户
-        Integer userId = UserContext.getUserId();
+        Long userId = UserContext.getUserId();
         // 2.获取数据库记录
         LambdaQueryWrapper<NoteBrowse> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(NoteBrowse::getUserId, userId);

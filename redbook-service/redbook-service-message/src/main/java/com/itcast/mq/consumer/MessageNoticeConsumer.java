@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 public class MessageNoticeConsumer {
 
     @RabbitListener(queues = {MqConstant.LOGIN_NOTICE_QUEUE})
-    public void loginNotice(Integer userId) {
+    public void loginNotice(Long userId) {
         log.info("登录用户的ID：{}", userId);
     }
 

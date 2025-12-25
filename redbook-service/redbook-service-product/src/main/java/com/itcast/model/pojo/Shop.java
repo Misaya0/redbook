@@ -53,7 +53,7 @@ public class Shop implements Serializable {
      * 用户id
      */
     @TableField("user_id")
-    private Integer userId;
+    private Long userId;
 
     /**
      * 挂链授权模式: 0-自动, 1-手动

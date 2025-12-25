@@ -40,12 +40,12 @@ public class AttentionServiceImpl implements AttentionService {
     private RabbitTemplate rabbitTemplate;
 
     @Override
-    public Result<Integer> isAttention(Integer otherId) {
+    public Result<Integer> isAttention(Long otherId) {
         int flag;
         // 1.获取登录用户id
-        Integer ownId = UserContext.getUserId();
+        Long ownId = UserContext.getUserId();
         // 2.判断是否是自己
-        if (otherId.intValue() == ownId.intValue()) {
+        if (otherId != null && otherId.equals(ownId)) {
             flag = AttentionTypeEnum.OWN.getCode();
         } else if(Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(RedisConstant.ATTENTION_CACHE + ownId, otherId))) {
             flag = AttentionTypeEnum.ATTENTION.getCode();
@@ -56,9 +56,9 @@ public class AttentionServiceImpl implements AttentionService {
     }
 
     @Override
-    public Result<Void> attention(Integer otherId) {
+    public Result<Void> attention(Long otherId) {
         // 1.获取登录用户id
-        Integer ownId = UserContext.getUserId();
+        Long ownId = UserContext.getUserId();
         // 2.设置pojo
         Attention attention = new Attention();
         attention.setOtherId(otherId);
@@ -82,11 +82,11 @@ public class AttentionServiceImpl implements AttentionService {
             // 用户关注，通知消息
             com.itcast.model.event.MessageEvent event = new com.itcast.model.event.MessageEvent();
             event.setEventId(java.util.UUID.randomUUID().toString());
-            event.setActorId(ownId.longValue());
-            event.setRecipientId(otherId.longValue());
+            event.setActorId(ownId);
+            event.setRecipientId(otherId);
             event.setType("FOLLOW");
             event.setTargetType("USER");
-            event.setTargetId(otherId.longValue());
+            event.setTargetId(otherId);
             event.setTimestamp(System.currentTimeMillis());
             event.setContentBrief("关注了你");
             
@@ -96,7 +96,7 @@ public class AttentionServiceImpl implements AttentionService {
     }
 
     @Override
-    public Result<List<AttentionVo>> getAttention(Integer userId) {
+    public Result<List<AttentionVo>> getAttention(Long userId) {
         LambdaQueryWrapper<Attention> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Attention::getOwnId, userId);
         List<Attention> attentionList = attentionMapper.selectList(queryWrapper);
@@ -104,7 +104,7 @@ public class AttentionServiceImpl implements AttentionService {
     }
 
     @Override
-    public Result<List<AttentionVo>> getFans(Integer userId) {
+    public Result<List<AttentionVo>> getFans(Long userId) {
         LambdaQueryWrapper<Attention> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Attention::getOtherId, userId);
         List<Attention> attentionList = attentionMapper.selectList(queryWrapper);
@@ -116,16 +116,16 @@ public class AttentionServiceImpl implements AttentionService {
             return Result.success(new ArrayList<>());
         }
 
-        List<Integer> userIds = attentionList.stream()
+        List<Long> userIds = attentionList.stream()
                 .map(a -> isAttentionList ? a.getOtherId() : a.getOwnId())
                 .collect(Collectors.toList());
 
         List<User> users = userMapper.selectBatchIds(userIds);
-        Map<Integer, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
+        Map<Long, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
 
         List<AttentionVo> vos = attentionList.stream().map(a -> {
             AttentionVo vo = new AttentionVo();
-            Integer targetId = isAttentionList ? a.getOtherId() : a.getOwnId();
+            Long targetId = isAttentionList ? a.getOtherId() : a.getOwnId();
             User user = userMap.get(targetId);
             if (user != null) {
                 vo.setUserId(user.getId());

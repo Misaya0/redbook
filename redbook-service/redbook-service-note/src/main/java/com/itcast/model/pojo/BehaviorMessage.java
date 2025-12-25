@@ -10,7 +10,7 @@ import java.util.Date;
 @Data
 @Builder
 public class BehaviorMessage implements Serializable {
-    private Integer userId;
+    private Long userId;
     private Long noteId;
     private Date viewTime;
     private Date leaveTime;

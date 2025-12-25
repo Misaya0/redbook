@@ -40,7 +40,7 @@
             v-model="searchKeyword"
             @keyup.enter="handleSearch"
             @input="handleInput"
-            @focus="showSuggestions = true"
+            @focus="handleFocus"
             @blur="handleBlur"
           />
 
@@ -66,6 +66,23 @@
               @mousedown="selectSuggestion(item)"
             >
               {{ item }}
+            </div>
+          </div>
+
+          <div class="search-history" v-if="showHistory && historyList.length > 0">
+            <div class="history-header">
+              <span class="history-title">搜索历史</span>
+              <button class="history-clear" @mousedown.prevent="clearHistory">清空</button>
+            </div>
+            <div class="history-list">
+              <button
+                v-for="(h, index) in historyList"
+                :key="h.id || index"
+                class="history-item"
+                @mousedown.prevent="selectHistory(h.history)"
+              >
+                {{ h.history }}
+              </button>
             </div>
           </div>
         </div>
@@ -128,7 +145,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useChatStore } from '@/store/chat'
@@ -149,6 +166,8 @@ if (userStore.isLoggedIn) {
 const searchKeyword = ref('')
 const suggestions = ref([])
 const showSuggestions = ref(false)
+const historyList = ref([])
+const showHistory = ref(false)
 
 // 获取用户头像
 const userAvatar = computed(() => {
@@ -170,6 +189,7 @@ const goToLogin = () => {
 const handleSearch = () => {
   if (!searchKeyword.value.trim()) return
   showSuggestions.value = false
+  showHistory.value = false
   router.push({
     path: '/search',
     query: { keyword: searchKeyword.value }
@@ -199,21 +219,82 @@ const fetchSuggestions = async () => {
   }
 }
 
-const handleInput = debounce(() => {
+const debouncedFetchSuggestions = debounce(() => {
   fetchSuggestions()
 }, 300)
+
+const handleInput = () => {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    suggestions.value = []
+    showSuggestions.value = false
+    showHistory.value = historyList.value.length > 0
+    return
+  }
+
+  showHistory.value = false
+  showSuggestions.value = true
+  debouncedFetchSuggestions()
+}
 
 const selectSuggestion = (item) => {
   searchKeyword.value = item
   handleSearch()
 }
 
+const selectHistory = (keyword) => {
+  searchKeyword.value = keyword
+  handleSearch()
+}
+
+const clearHistory = async () => {
+  try {
+    await searchApi.deleteHistory()
+    historyList.value = []
+    showHistory.value = false
+  } catch (e) {
+    showHistory.value = false
+  }
+}
+
+const fetchHistory = async () => {
+  if (!userStore.isLoggedIn) {
+    historyList.value = []
+    return
+  }
+  try {
+    const list = await searchApi.getHistoryList()
+    historyList.value = Array.isArray(list) ? list : []
+  } catch (e) {
+    historyList.value = []
+  }
+}
+
+const handleFocus = () => {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword && historyList.value.length > 0) {
+    showHistory.value = true
+    showSuggestions.value = false
+    return
+  }
+  showHistory.value = false
+  showSuggestions.value = true
+  if (keyword) {
+    fetchSuggestions()
+  }
+}
+
 const handleBlur = () => {
   // Delay hiding to allow click event to trigger
   setTimeout(() => {
     showSuggestions.value = false
+    showHistory.value = false
   }, 200)
 }
+
+onMounted(() => {
+  fetchHistory()
+})
 
 // 退出登录
 const handleLogout = async () => {
@@ -249,6 +330,72 @@ const handlePublish = async () => {
   max-height: 300px;
   overflow-y: auto;
   z-index: 1001;
+}
+
+.search-history {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  margin-top: 8px;
+  z-index: 1001;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.history-title {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+.history-clear {
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  color: #999;
+  font-size: 12px;
+}
+
+.history-clear:hover {
+  background: #f7f7f7;
+  color: #666;
+}
+
+.history-list {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-item {
+  border: 1px solid #eee;
+  background: #fafafa;
+  color: #333;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: #fff1f2;
+  border-color: #ffccd5;
+  color: #ff2442;
 }
 
 .suggestion-item {
