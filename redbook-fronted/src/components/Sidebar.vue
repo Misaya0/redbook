@@ -31,21 +31,6 @@
     </div>
 
     <div class="sidebar-section">
-      <h3 class="section-title">热门话题</h3>
-      <div class="topic-list">
-        <div
-          v-for="topic in hotTopics"
-          :key="topic.id"
-          class="topic-item"
-          @click="handleTopicClick(topic)"
-        >
-          <span class="topic-tag">#{{ topic.name }}</span>
-          <span class="topic-count">{{ formatNumber(topic.posts) }}篇笔记</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-section">
       <h3 class="section-title">推荐频道</h3>
       <div class="channel-list">
         <div
@@ -93,14 +78,6 @@ const recommendedUsers = ref([
   }
 ])
 
-const hotTopics = ref([
-  { id: 1, name: '秋冬穿搭', posts: 12500 },
-  { id: 2, name: '护肤心得', posts: 8900 },
-  { id: 3, name: '美食探店', posts: 15600 },
-  { id: 4, name: '旅行攻略', posts: 9800 },
-  { id: 5, name: '家居好物', posts: 7200 }
-])
-
 const channels = ref([
   { id: 1, name: '时尚穿搭', icon: 'https://via.placeholder.com/24x24/ff2442/ffffff?text=F' },
   { id: 2, name: '美妆护肤', icon: 'https://via.placeholder.com/24x24/ff6b6b/ffffff?text=M' },
@@ -114,21 +91,8 @@ const toggleFollow = (user) => {
   user.isFollowed = !user.isFollowed
 }
 
-const handleTopicClick = (topic) => {
-  console.log('点击话题:', topic.name)
-}
-
 const handleChannelClick = (channel) => {
   console.log('点击频道:', channel.name)
-}
-
-const formatNumber = (num) => {
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + 'w'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
 }
 </script>
 
@@ -256,6 +220,93 @@ const formatNumber = (num) => {
 }
 
 .topic-count {
+  font-size: 12px;
+  color: #999;
+}
+
+.hot-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hot-tab {
+  flex: 1;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid #eee;
+  background: #fafafa;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.active {
+    background: #ff2442;
+    border-color: #ff2442;
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.hot-loading,
+.hot-empty {
+  padding: 12px 0;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+.hot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hot-item {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8f8f8;
+}
+
+.hot-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #999;
+  background: #fff;
+  border: 1px solid #eee;
+
+  &.top3 {
+    color: #ff2442;
+    border-color: rgba(255, 36, 66, 0.25);
+    background: rgba(255, 36, 66, 0.06);
+    font-weight: 700;
+  }
+}
+
+.hot-key {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hot-score {
   font-size: 12px;
   color: #999;
 }

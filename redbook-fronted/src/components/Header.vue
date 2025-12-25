@@ -69,20 +69,77 @@
             </div>
           </div>
 
-          <div class="search-history" v-if="showHistory && historyList.length > 0">
-            <div class="history-header">
-              <span class="history-title">搜索历史</span>
-              <button class="history-clear" @mousedown.prevent="clearHistory">清空</button>
+          <div class="search-history" v-if="(showHistory && historyList.length > 0) || (showHistory && !searchKeyword.trim())">
+            <!-- 搜索历史 -->
+            <div v-if="historyList.length > 0">
+              <div class="history-header">
+                <span class="history-title">搜索历史</span>
+                <button class="history-clear" @mousedown.prevent="clearHistory">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="history-list">
+                <button
+                  v-for="(h, index) in historyList"
+                  :key="h.id || index"
+                  class="history-item"
+                  @mousedown.prevent="selectHistory(h.history)"
+                >
+                  {{ h.history }}
+                </button>
+              </div>
             </div>
-            <div class="history-list">
-              <button
-                v-for="(h, index) in historyList"
-                :key="h.id || index"
-                class="history-item"
-                @mousedown.prevent="selectHistory(h.history)"
-              >
-                {{ h.history }}
-              </button>
+
+            <!-- 小红书热点 -->
+            <div class="hot-search-container">
+              <div class="hot-header">
+                <div class="hot-title">
+                  <span class="hot-icon">🔥</span>
+                  小红书热点
+                </div>
+                <div class="hot-tabs">
+                  <span 
+                    :class="['hot-tab-item', { active: currentHotType === 1 }]"
+                    @mousedown.prevent="switchHotType(1)"
+                  >今日</span>
+                  <span class="hot-tab-divider">|</span>
+                  <span 
+                    :class="['hot-tab-item', { active: currentHotType === 0 }]"
+                    @mousedown.prevent="switchHotType(0)"
+                  >全站</span>
+                </div>
+              </div>
+
+              <div v-if="hotLoading" class="hot-loading-skeleton">
+                <div v-for="i in 5" :key="i" class="skeleton-item"></div>
+              </div>
+              
+              <div v-else class="hot-list">
+                <div 
+                  v-for="(item, index) in hotList" 
+                  :key="index" 
+                  class="hot-item"
+                  :title="`搜索: ${item.key}`"
+                  @mousedown.prevent="selectHotSearch(item.key)"
+                >
+                  <div class="hot-left">
+                    <span :class="['hot-index', `index-${index + 1}`, { 'top-three': index < 3 }]">{{ index + 1 }}</span>
+                    <span class="hot-keyword">{{ item.key }}</span>
+                    <span v-if="index < 3" class="hot-tag tag-red">热</span>
+                    <span v-else-if="index < 6" class="hot-tag tag-orange">梗</span>
+                  </div>
+                  <div class="hot-right">
+                    <span class="hot-score-icon">🔥</span>
+                    <span class="hot-score">{{ formatNumber(item.score || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!hotLoading && hotList.length === 0" class="hot-empty">
+                暂无热点数据
+              </div>
             </div>
           </div>
         </div>
@@ -169,6 +226,40 @@ const showSuggestions = ref(false)
 const historyList = ref([])
 const showHistory = ref(false)
 
+// 热搜相关
+const hotList = ref([])
+const currentHotType = ref(1) // 默认展示今日热搜
+const hotLoading = ref(false)
+
+const formatNumber = (num) => {
+  if (num >= 10000000) {
+    return (num / 10000000).toFixed(1) + '千万'
+  } else if (num >= 10000) {
+    return (num / 10000).toFixed(1) + '万'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'k'
+  }
+  return num.toString()
+}
+
+const fetchHotList = async () => {
+  hotLoading.value = true
+  try {
+    const res = await searchApi.getHotList(currentHotType.value)
+    hotList.value = Array.isArray(res) ? res.slice(0, 10) : [] // 只展示前10个
+  } catch (e) {
+    hotList.value = []
+  } finally {
+    hotLoading.value = false
+  }
+}
+
+const switchHotType = async (type) => {
+  if (currentHotType.value === type) return
+  currentHotType.value = type
+  await fetchHotList()
+}
+
 // 获取用户头像
 const userAvatar = computed(() => {
   return getImageUrl(userStore.userInfo?.image, 'https://via.placeholder.com/32x32/ff2442/ffffff?text=U')
@@ -228,7 +319,7 @@ const handleInput = () => {
   if (!keyword) {
     suggestions.value = []
     showSuggestions.value = false
-    showHistory.value = historyList.value.length > 0
+    showHistory.value = true
     return
   }
 
@@ -243,6 +334,11 @@ const selectSuggestion = (item) => {
 }
 
 const selectHistory = (keyword) => {
+  searchKeyword.value = keyword
+  handleSearch()
+}
+
+const selectHotSearch = (keyword) => {
   searchKeyword.value = keyword
   handleSearch()
 }
@@ -272,16 +368,14 @@ const fetchHistory = async () => {
 
 const handleFocus = () => {
   const keyword = searchKeyword.value.trim()
-  if (!keyword && historyList.value.length > 0) {
+  if (!keyword) {
     showHistory.value = true
     showSuggestions.value = false
     return
   }
   showHistory.value = false
   showSuggestions.value = true
-  if (keyword) {
-    fetchSuggestions()
-  }
+  fetchSuggestions()
 }
 
 const handleBlur = () => {
@@ -294,6 +388,7 @@ const handleBlur = () => {
 
 onMounted(() => {
   fetchHistory()
+  fetchHotList()
 })
 
 // 退出登录
@@ -344,18 +439,18 @@ const handlePublish = async () => {
   margin-top: 8px;
   z-index: 1001;
   overflow: hidden;
+  width: 350px; /* 稍微加宽一点展示热搜 */
 }
 
 .history-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 16px;
 }
 
 .history-title {
-  font-size: 13px;
+  font-size: 14px;
   color: #333;
   font-weight: 600;
 }
@@ -363,39 +458,207 @@ const handlePublish = async () => {
 .history-clear {
   background: transparent;
   border: none;
-  padding: 6px 10px;
-  border-radius: 14px;
+  padding: 4px;
   cursor: pointer;
   color: #999;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
 .history-clear:hover {
-  background: #f7f7f7;
-  color: #666;
+  background: #f5f5f5;
+  color: #ff2442;
 }
 
 .history-list {
-  padding: 10px 12px 12px;
+  padding: 0 16px 12px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .history-item {
-  border: 1px solid #eee;
-  background: #fafafa;
-  color: #333;
-  font-size: 13px;
-  padding: 8px 12px;
+  border: none;
+  background: #f5f5f5;
+  color: #666;
+  font-size: 12px;
+  padding: 6px 14px;
   border-radius: 999px;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .history-item:hover {
-  background: #fff1f2;
-  border-color: #ffccd5;
+  background: #eeeeee;
+  color: #333;
+}
+
+/* 热搜榜单样式 */
+.hot-search-container {
+  border-top: 1px solid #f0f0f0;
+  padding: 16px 0;
+}
+
+.hot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 12px;
+}
+
+.hot-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hot-icon {
+  font-size: 16px;
   color: #ff2442;
+}
+
+.hot-tabs {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #999;
+}
+
+.hot-tab-item {
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color 0.2s;
+}
+
+.hot-tab-item.active {
+  color: #ff2442;
+  font-weight: 600;
+}
+
+.hot-tab-divider {
+  margin: 0 4px;
+  color: #eee;
+  font-size: 10px;
+}
+
+.hot-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.hot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.hot-item:hover {
+  background: #f9f9f9;
+}
+
+.hot-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hot-index {
+  font-size: 14px;
+  font-weight: 700;
+  color: #999;
+  width: 20px;
+  text-align: center;
+  font-style: italic;
+}
+
+.hot-index.top-three {
+  color: #ff2442;
+}
+
+/* 渐变排名颜色 */
+.index-1 { color: #ff2442; }
+.index-2 { color: #ff6b22; }
+.index-3 { color: #ffb112; }
+
+.hot-keyword {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hot-tag {
+  font-size: 10px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
+  transform: scale(0.9);
+}
+
+.tag-red {
+  background: #ff2442;
+}
+
+.tag-orange {
+  background: #ffa502;
+}
+
+.hot-right {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hot-score-icon {
+  font-size: 10px;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.hot-score {
+  font-size: 12px;
+  color: #999;
+}
+
+.hot-loading-skeleton {
+  padding: 0 16px;
+}
+
+.skeleton-item {
+  height: 36px;
+  background: #f5f5f5;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.hot-empty {
+  text-align: center;
+  padding: 20px 0;
+  font-size: 13px;
+  color: #999;
 }
 
 .suggestion-item {

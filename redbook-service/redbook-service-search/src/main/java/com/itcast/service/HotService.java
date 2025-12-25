@@ -6,5 +6,5 @@ import java.util.List;
 import java.util.Map;
 
 public interface HotService {
-    Result<List<Map<String, Object>>> getHotList();
+    Result<List<Map<String, Object>>> getHotList(Integer type);
 }

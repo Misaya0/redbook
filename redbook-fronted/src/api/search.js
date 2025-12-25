@@ -33,5 +33,23 @@ export const searchApi = {
       url: '/search/deleteHistory',
       method: 'delete'
     })
+  },
+
+  // 获取热搜榜单
+  getHotList: async (type) => {
+    try {
+      return await request({
+        url: '/search/hot',
+        method: 'get',
+        params: { type },
+        skipErrorHandler: true
+      })
+    } catch (e) {
+      return request({
+        url: '/search/getHotList',
+        method: 'get',
+        params: { type }
+      })
+    }
   }
 }

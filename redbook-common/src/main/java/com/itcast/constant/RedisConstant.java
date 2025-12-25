@@ -6,6 +6,7 @@ public class RedisConstant {
     public static final String NOTE_GEO = "redbook:note:note_geo:";
     public static final String NOTE_DETAIL_CACHE = "redbook:note:note_detail_cache:";
     public static final String NOTE_SCORE = "redbook:note:note_score:";
+    public static final String NOTE_SCORE_TODAY_PREFIX = "note:score:date:";
     public static final String LIKE_SET_CACHE = "redbook:note:like_set_cache:";
     public static final String COLLECTION_SET_CACHE = "redbook:note:collection_set_cache:";
     public static final String USER_BLOOM_FILTER = "redbook:note:user_bloom_filter:";

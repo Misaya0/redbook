@@ -41,8 +41,11 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -95,7 +98,7 @@ public class SearchServiceImpl implements SearchService {
         saveSearchHistory(key);
         
         // 6.保存热度
-        redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, key, 1);
+        incrementHotScore(key);
         return Result.success(noteVos);
     }
 
@@ -296,9 +299,26 @@ public class SearchServiceImpl implements SearchService {
             List<NoteVo> noteVos = fillNoteVoList(hits);
 
             saveSearchHistory(keyword);
-            redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, keyword, 1);
+            incrementHotScore(keyword);
 
             return Result.success(noteVos);
+        }
+    }
+
+    private void incrementHotScore(String keyword) {
+        if (StringUtils.isBlank(keyword)) {
+            return;
+        }
+
+        redisTemplate.opsForZSet().incrementScore(RedisConstant.NOTE_SCORE, keyword, 1);
+
+        String dateStr = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String todayKey = RedisConstant.NOTE_SCORE_TODAY_PREFIX + dateStr;
+
+        Boolean existed = redisTemplate.hasKey(todayKey);
+        redisTemplate.opsForZSet().incrementScore(todayKey, keyword, 1);
+        if (existed == null || !existed) {
+            redisTemplate.expire(todayKey, 48, TimeUnit.HOURS);
         }
     }
 
