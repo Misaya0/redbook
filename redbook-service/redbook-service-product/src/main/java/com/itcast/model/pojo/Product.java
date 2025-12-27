@@ -63,6 +63,12 @@ public class Product implements Serializable {
     private String detailImages;
 
     /**
+     * 销量
+     */
+    @TableField("sales")
+    private Integer sales;
+
+    /**
      * 状态: 0-下架, 1-上架
      */
     @TableField("status")

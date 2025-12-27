@@ -21,8 +21,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -62,7 +62,7 @@ public class CommentServiceImpl implements CommentService {
         Comment comment = new Comment();
         BeanUtils.copyProperties(commentDto, comment);
         comment.setUserId(userId);
-        comment.setTime(new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
+        comment.setTime(LocalDateTime.now());
         comment.setLikeCount(0);
 
         // 处理回复逻辑
@@ -123,7 +123,7 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public Result<List<CommentVo>> getCommentList(Long noteId) throws ParseException {
+    public Result<List<CommentVo>> getCommentList(Long noteId) {
         List<CommentVo> commentVoList = new ArrayList<>();
         
         // 获取当前登录用户点赞过的评论ID集合
@@ -169,9 +169,11 @@ public class CommentServiceImpl implements CommentService {
                 .filter(comment -> comment.getParentId() != null && comment.getParentId() == 0)
                 .collect(Collectors.toList());
         // 3.构建树模型
+        int totalCount = commentList.size();
         for (Comment comment : parentList) {
             CommentVo commentVo = convertToCommentVo(comment, likedCommentIds, userCache);
             commentVo.setChildrenList(buildChildrenList(comment.getId(), commentList, likedCommentIds, userCache));
+            commentVo.setTotalCount(totalCount);
             commentVoList.add(commentVo);
         }
         return Result.success(commentVoList);
@@ -245,14 +247,15 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds, Map<Long, User> userCache) throws ParseException {
+    private CommentVo convertToCommentVo(Comment comment, Set<Long> likedCommentIds, Map<Long, User> userCache) {
         String dealTime = "";
         try {
-             dealTime = DealTimeUtil.dealTime(
-                    DiffDayUtil.diffDays(
-                            new SimpleDateFormat("yyyy-MM-dd").parse(comment.getTime()), new Date()));
+            if (comment.getTime() != null) {
+                long days = ChronoUnit.DAYS.between(comment.getTime().toLocalDate(), LocalDateTime.now().toLocalDate());
+                dealTime = DealTimeUtil.dealTime((int) days);
+            }
         } catch (Exception e) {
-             dealTime = comment.getTime();
+            dealTime = comment.getTime() != null ? comment.getTime().toString() : "";
         }
         
         CommentVo commentVo = new CommentVo();
@@ -292,7 +295,7 @@ public class CommentServiceImpl implements CommentService {
      * @return
      * @throws ParseException
      */
-    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds, Map<Long, User> userCache) throws ParseException {
+    private List<CommentVo> buildChildrenList(Long parentId, List<Comment> commentList, Set<Long> likedCommentIds, Map<Long, User> userCache) {
         List<CommentVo> childrenVoList = new ArrayList<>();
         for (Comment comment : commentList) {
             if (parentId.equals(comment.getParentId())) {

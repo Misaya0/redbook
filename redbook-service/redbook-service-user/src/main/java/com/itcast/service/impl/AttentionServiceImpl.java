@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +76,7 @@ public class AttentionServiceImpl implements AttentionService {
             redisTemplate.opsForSet().remove(RedisConstant.ATTENTION_CACHE + ownId, otherId);
         }else{
             // 4.2 关注
-            attention.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()));
+            attention.setTime(LocalDateTime.now());
             attentionMapper.insert(attention);
             redisTemplate.opsForSet().add(RedisConstant.ATTENTION_CACHE + ownId, otherId);
 

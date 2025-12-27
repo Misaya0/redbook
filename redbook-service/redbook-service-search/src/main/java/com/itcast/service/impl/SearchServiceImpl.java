@@ -7,6 +7,7 @@ import com.itcast.constant.RedisConstant;
 import com.itcast.mapper.HistoryMapper;
 import com.itcast.mapper.UserMapper;
 import com.itcast.model.dto.ProductEsDTO;
+import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.pojo.History;
 import com.itcast.model.pojo.Note;
 
@@ -197,7 +198,7 @@ public class SearchServiceImpl implements SearchService {
     }
 
     @Override
-    public Result<Object> searchProduct(com.itcast.model.dto.ProductSearchDto searchDto) throws IOException {
+    public Result<Object> searchProduct(ProductSearchDto searchDto) throws IOException {
         SearchRequest request = new SearchRequest("rb_product");
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
 

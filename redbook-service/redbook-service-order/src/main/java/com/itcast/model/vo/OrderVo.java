@@ -2,6 +2,7 @@ package com.itcast.model.vo;
 
 import lombok.Data;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 public class OrderVo {
@@ -16,7 +17,7 @@ public class OrderVo {
     private BigDecimal finalPrice;
     private Long userId;
     private Integer status;
-    private String createTime;
+    private LocalDateTime createTime;
 
     /**
      * SKU规格描述 (如: 颜色:红 / 尺码:L)

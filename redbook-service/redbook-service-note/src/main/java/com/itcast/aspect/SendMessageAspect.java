@@ -17,7 +17,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Component
 @Aspect
@@ -49,15 +49,15 @@ public class SendMessageAspect {
             behaviorMessage = BehaviorMessage.builder()
                     .userId(userId)
                     .noteId(noteId)
-                    .viewTime(new Date())
-                    .leaveTime(new Date())
+                    .viewTime(LocalDateTime.now())
+                    .leaveTime(LocalDateTime.now())
                     .logType(LogType.SCAN)
                     .build();
         } else if (type == LogType.LIKE) {
             behaviorMessage = BehaviorMessage.builder()
                     .userId(userId)
                     .noteId(noteId)
-                    .likeTime(new Date())
+                    .likeTime(LocalDateTime.now())
                     .logType(LogType.LIKE)
                     .build();
         }

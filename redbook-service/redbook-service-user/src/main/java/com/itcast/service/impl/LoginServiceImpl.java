@@ -6,6 +6,7 @@ import com.itcast.constant.MqConstant;
 import com.itcast.constant.RedisConstant;
 import com.itcast.exception.CodeErrorException;
 import com.itcast.mapper.UserMapper;
+import com.itcast.model.vo.LoginVo;
 import com.itcast.result.Result;
 import com.itcast.service.LoginService;
 import com.itcast.model.dto.LoginDto;
@@ -18,6 +19,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -74,6 +77,7 @@ public class LoginServiceImpl implements LoginService {
             Long number = NumberUtil.getNumber();
             user.setNumber(number);
             user.setRole(0); // 默认为普通用户
+            user.setTime(LocalDateTime.now());
             userMapper.insert(user);
             userId = user.getId();
         } else {
@@ -87,7 +91,7 @@ public class LoginServiceImpl implements LoginService {
         rabbitTemplate.convertAndSend(MqConstant.MESSAGE_NOTICE_EXCHANGE, MqConstant.LOGIN_KEY, userId);
 
         // 7.返回结果
-        com.itcast.model.vo.LoginVo loginVo = new com.itcast.model.vo.LoginVo();
+        LoginVo loginVo = new LoginVo();
         loginVo.setToken(token);
         loginVo.setRole(role);
         

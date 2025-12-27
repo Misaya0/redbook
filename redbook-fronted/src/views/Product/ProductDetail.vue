@@ -1,7 +1,8 @@
 <template>
-  <div class="product-detail">
-    <!-- 顶部导航 -->
-    <div class="nav-header">
+  <div class="product-detail-container">
+    <div class="product-detail">
+      <!-- 顶部导航 -->
+      <div class="nav-header">
       <button type="button" class="nav-icon-btn" @click="router.back()" aria-label="返回">
         <span class="nav-icon nav-icon--back" aria-hidden="true"></span>
       </button>
@@ -55,7 +56,7 @@
             <div class="shop-name">{{ product.shop.name }}</div>
             <div class="shop-stats">粉丝 {{ product.shop.fans || 0 }}</div>
           </div>
-          <button class="shop-btn">进店</button>
+          <button class="shop-btn" @click="goToShop">进店</button>
         </div>
       </div>
 
@@ -86,7 +87,7 @@
 
     <!-- 底部操作栏 -->
     <div class="bottom-bar">
-      <div class="icon-btn">
+      <div class="icon-btn" @click="goToShop">
         <span class="icon">🏠</span>
         <span class="text">店铺</span>
       </div>
@@ -98,10 +99,13 @@
         <span class="icon">⭐</span>
         <span class="text">收藏</span>
       </div>
-      <button class="action-btn cart-btn">加入购物车</button>
-      <button class="action-btn buy-btn" @click="handleBuy">立即购买</button>
+      <div class="action-btns">
+        <button class="add-cart">加入购物车</button>
+        <button class="buy-now" @click="handleBuy">立即购买</button>
+      </div>
     </div>
   </div>
+</div>
 </template>
 
 <script setup>
@@ -167,6 +171,14 @@ const fetchProduct = async () => {
   }
 }
 
+const goToShop = () => {
+  if (product.value.shop?.id) {
+    router.push(`/shop/${product.value.shop.id}`)
+  } else if (product.value.shopId) {
+    router.push(`/shop/${product.value.shopId}`)
+  }
+}
+
 const handleBuy = async () => {
   if (!selectedSkuId.value && product.value.skus && product.value.skus.length > 0) {
     showToast('请选择规格')
@@ -219,11 +231,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.product-detail-container {
+  min-height: 100vh;
+  background: #f5f7fa;
+  display: flex;
+  justify-content: center;
+}
+
 .product-detail {
-  height: 100vh;
-  background: #f5f5f5;
+  width: 100%;
+  max-width: 800px;
+  background: #ffffff;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
   --nav-icon-color: #333;
   --nav-icon-bg-hover: rgba(0, 0, 0, 0.05);
   --nav-icon-bg-active: rgba(0, 0, 0, 0.08);
@@ -477,12 +500,50 @@ onMounted(() => {
 }
 
 .bottom-bar {
-  height: 50px;
-  background: white;
-  border-top: 1px solid #eee;
+  height: 60px;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   padding: 0 16px;
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  max-width: 800px;
+  width: 100%;
+}
+
+.action-btns {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.add-cart, .buy-now {
+  flex: 1;
+  height: 40px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.add-cart {
+  background: #fff1f2;
+  color: #ff2442;
+  border: 1px solid #ff2442;
+}
+
+.buy-now {
+  background: #ff2442;
+  color: #fff;
+}
+
+.add-cart:hover, .buy-now:hover {
+  opacity: 0.9;
 }
 
 .icon-btn {

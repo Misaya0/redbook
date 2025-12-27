@@ -8,7 +8,8 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 @Data
 @TableName("rb_coupon")
@@ -40,7 +41,8 @@ public class Coupon implements Serializable {
     /**
      * 有效截至时间
      */
-    private Date time;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime time;
 
     /**
      * 库存

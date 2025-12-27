@@ -58,7 +58,7 @@
 
               <!-- 评论区 -->
               <div class="comments-section">
-                <div class="comments-header">共 {{ comments.length }} 条评论</div>
+                <div class="comments-header">共 {{ comments.length > 0 ? comments[0].totalCount : 0 }} 条评论</div>
                 
                 <div v-if="commentsLoading" class="comments-loading">
                   加载评论中...

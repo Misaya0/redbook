@@ -2,6 +2,8 @@ package com.itcast.model.dto;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 public class ProductEsDTO {
     private Long id;
@@ -13,5 +15,5 @@ public class ProductEsDTO {
     private Long shopId;
     private Long categoryId;
     private String image;
-    private String createTime;
+    private LocalDateTime createTime;
 }

@@ -17,11 +17,11 @@
 
           <!-- 社交数据统计 -->
           <div class="stats-row">
-            <div class="stat-item">
+            <div class="stat-item" @click="openUserList('attention')">
               <span class="count">{{ stats.attentionCount || 0 }}</span>
               <span class="label">关注</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item" @click="openUserList('fans')">
               <span class="count">{{ stats.fansCount || 0 }}</span>
               <span class="label">粉丝</span>
             </div>
@@ -103,8 +103,10 @@
                 <p class="shop-desc">成立时间: {{ shop.time }}</p>
               </div>
             </div>
-            <el-button type="primary" plain size="small" @click="$router.push('/merchant/products')">进入商品管理
-            </el-button>
+            <div class="header-actions">
+              <el-button type="primary" plain size="small" @click="$router.push(`/shop/${shop.id}`)">预览店铺</el-button>
+              <el-button type="primary" plain size="small" @click="$router.push('/merchant/products')">商品管理</el-button>
+            </div>
           </div>
 
           <!-- 数据仪表盘 -->
@@ -244,6 +246,26 @@
     </div>
 
     <!-- 创建店铺弹窗 -->
+    <div v-if="showUserListModal" class="modal-overlay" @click="showUserListModal = false">
+      <div class="modal-content user-list-modal" @click.stop>
+        <div class="modal-header">
+          <h3>{{ userListTitle }}</h3>
+          <button class="close-btn" @click="showUserListModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="userListLoading" class="loading-spinner-small"></div>
+          <div v-else-if="userList.length === 0" class="empty-text">暂无数据</div>
+          <div v-else class="user-list">
+            <div v-for="user in userList" :key="user.userId || user.id" class="user-list-item"
+                 @click="handleUserClick(user)">
+              <img :src="getImageUrl(user.image, defaultAvatar)" class="user-item-avatar"/>
+              <span class="user-item-name">{{ user.nickname || '用户' + (user.userId || user.id) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <el-dialog v-model="showCreateModal" title="创建店铺" width="500px">
       <el-form :model="createForm" label-width="80px">
         <el-form-item label="店铺名称">
@@ -303,6 +325,19 @@ const productsLoading = ref(false)
 // 关注状态
 const isFollowed = ref(false)
 const followLoading = ref(false)
+
+const defaultAvatar = 'https://via.placeholder.com/100'
+
+const showUserListModal = ref(false)
+const userListTitle = ref('')
+const userList = ref([])
+const userListLoading = ref(false)
+
+const viewUserId = computed(() => {
+  const currentUserId = userStore.userInfo?.id
+  const targetId = route.params.id
+  return targetId || currentUserId
+})
 
 // 判断是否是本人
 const isSelf = computed(() => {
@@ -457,6 +492,41 @@ const handleFollow = async () => {
 const handleChat = () => {
   // router.push(`/message/chat/${targetId}`)
   ElMessage.info('私信功能开发中')
+}
+
+const openUserList = async (type) => {
+  if (!viewUserId.value) {
+    ElMessage.warning('用户信息未加载完成')
+    return
+  }
+
+  showUserListModal.value = true
+  userListLoading.value = true
+  userList.value = []
+
+  try {
+    if (type === 'attention') {
+      userListTitle.value = '关注列表'
+      const res = await getAttentionList(viewUserId.value)
+      userList.value = res || []
+    } else {
+      userListTitle.value = '粉丝列表'
+      const res = await getFansList(viewUserId.value)
+      userList.value = res || []
+    }
+  } catch (err) {
+    console.error(err)
+  } finally {
+    userListLoading.value = false
+  }
+}
+
+const handleUserClick = (user) => {
+  const targetUserId = user.userId || user.id
+  if (!targetUserId) return
+  showUserListModal.value = false
+  if (String(targetUserId) === String(viewUserId.value)) return
+  router.push(`/user/${targetUserId}`)
 }
 
 const handleCreateShop = async () => {
@@ -661,9 +731,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .shop-basic {
@@ -790,5 +863,110 @@ onMounted(() => {
   text-align: center;
   padding: 60px 0;
   color: #999;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-content {
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 120px));
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+}
+
+.close-btn {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #999;
+  padding: 4px;
+}
+
+.modal-body {
+  padding: 12px 16px 16px;
+  overflow: auto;
+}
+
+.loading-spinner-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #f1f1f1;
+  border-top-color: #ff2442;
+  margin: 24px auto;
+  animation: spin 0.9s linear infinite;
+}
+
+.empty-text {
+  text-align: center;
+  padding: 28px 0;
+  color: #999;
+  font-size: 13px;
+}
+
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-list-item:hover {
+  background: #fafafa;
+}
+
+.user-item-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-item-name {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

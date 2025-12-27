@@ -1,12 +1,12 @@
 package com.itcast.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itcast.constant.MqConstant;
 import com.itcast.mapper.NoteMapper;
 import com.itcast.model.dto.NoteDto;
 import com.itcast.model.dto.NoteEsSyncMessage;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
-import com.google.gson.Gson;
 import com.itcast.mapper.NoteSyncMapper;
 import com.itcast.model.pojo.Note;
 import com.itcast.service.EsNoteSyncService;
@@ -42,7 +42,8 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    private final Gson gson = new Gson();
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     public void syncAllNotesToEs() throws IOException {
@@ -84,7 +85,7 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
         for (Note note : notes) {
             IndexRequest indexRequest = new IndexRequest("rb_note")
                     .id(String.valueOf(note.getId()))
-                    .source(gson.toJson(note), XContentType.JSON);
+                    .source(objectMapper.writeValueAsString(note), XContentType.JSON);
             bulkRequest.add(indexRequest);
         }
 
@@ -105,7 +106,7 @@ public class EsNoteSyncServiceImpl implements EsNoteSyncService {
                     "    \"title\":     { \"type\": \"text\",  \"analyzer\": \"ik_max_word\", \"search_analyzer\": \"ik_smart\", \"fields\": {\"keyword\": {\"type\": \"keyword\", \"ignore_above\": 256}} },\n" +
                     "    \"content\":   { \"type\": \"text\",  \"analyzer\": \"ik_max_word\", \"search_analyzer\": \"ik_smart\" },\n" +
                     "    \"image\":     { \"type\": \"keyword\" },\n" +
-                    "    \"time\":      { \"type\": \"keyword\" },\n" + // 或改 date\n" +
+                    "    \"time\":      { \"type\": \"date\", \"format\": \"yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis\" },\n" +
                     "    \"type\":      { \"type\": \"keyword\" },\n" +
                     "    \"address\":   { \"type\": \"keyword\" },\n" +
                     "    \"longitude\": { \"type\": \"double\" },\n" +

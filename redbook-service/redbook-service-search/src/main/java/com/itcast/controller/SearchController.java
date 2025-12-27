@@ -1,5 +1,6 @@
 package com.itcast.controller;
 
+import com.itcast.model.dto.ProductSearchDto;
 import com.itcast.model.vo.NoteVo;
 import com.itcast.result.Result;
 import com.itcast.service.SearchService;
@@ -46,7 +47,7 @@ public class SearchController {
 
     @Operation(summary = "搜索商品 (ES)", description = "商品专用高级搜索")
     @PostMapping("/product")
-    public Result<Object> searchProduct(@RequestBody com.itcast.model.dto.ProductSearchDto searchDto) throws IOException {
+    public Result<Object> searchProduct(@RequestBody ProductSearchDto searchDto) throws IOException {
         return searchService.searchProduct(searchDto);
     }
 

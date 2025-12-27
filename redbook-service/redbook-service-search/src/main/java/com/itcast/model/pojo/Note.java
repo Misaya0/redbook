@@ -1,8 +1,10 @@
 package com.itcast.model.pojo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Data
 public class Note implements Serializable {
@@ -31,7 +33,8 @@ public class Note implements Serializable {
     /**
      * 发布时间
      */
-    private String time;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime time;
 
     /**
      * 类型

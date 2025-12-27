@@ -5,15 +5,15 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 public class BehaviorMessage implements Serializable {
     private Long userId;
     private Long noteId;
-    private Date viewTime;
-    private Date leaveTime;
-    private Date likeTime;
+    private LocalDateTime viewTime;
+    private LocalDateTime leaveTime;
+    private LocalDateTime likeTime;
     private LogType logType;
 }

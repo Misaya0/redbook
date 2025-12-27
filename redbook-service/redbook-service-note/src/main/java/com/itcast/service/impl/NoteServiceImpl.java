@@ -35,8 +35,8 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -91,7 +91,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     @SendMessage(type = LogType.SCAN)
-    public Result<NoteVo> getNote(Long noteId) throws ParseException {
+    public Result<NoteVo> getNote(Long noteId) {
         Note note = null;
         int retryCount = 0;
         int maxRetries = 3; // 最大自旋重试次数
@@ -191,11 +191,13 @@ public class NoteServiceImpl implements NoteService {
         }
 
         // 4.处理时间字符串
-        int days = DiffDayUtil.diffDays(
-                new SimpleDateFormat("yyyy-MM-dd").parse(note.getTime()), new Date());
-        String dealTime = DealTimeUtil.dealTime(days);
-        if (StringUtils.isBlank(dealTime)) {
-            dealTime = note.getTime();
+        String dealTime = "";
+        if (note.getTime() != null) {
+            long days = ChronoUnit.DAYS.between(note.getTime().toLocalDate(), LocalDateTime.now().toLocalDate());
+            dealTime = DealTimeUtil.dealTime((int) days);
+            if (StringUtils.isBlank(dealTime)) {
+                dealTime = note.getTime().toString();
+            }
         }
 
         // 5.设置vo

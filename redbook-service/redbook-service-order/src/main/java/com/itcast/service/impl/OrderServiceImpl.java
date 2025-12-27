@@ -50,7 +50,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderServiceImpl implements OrderService {
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_PAYMENT_TIMEOUT_SECONDS = 120;
     private static final String SKU_STOCK_KEY_PREFIX = "product:stock:";
     private static final String MQ_STOCK_ROLLBACK_KEY_PREFIX = "order:mq:stockRollback:";
@@ -235,11 +234,11 @@ public class OrderServiceImpl implements OrderService {
             return Result.failure("订单状态不可支付");
         }
 
-        if (!StringUtils.hasText(dbOrder.getCreateTime())) {
+        if (dbOrder.getCreateTime() == null) {
             return Result.failure("订单创建时间缺失");
         }
         try {
-            LocalDateTime createTime = LocalDateTime.parse(dbOrder.getCreateTime(), DATE_TIME_FORMATTER);
+            LocalDateTime createTime = dbOrder.getCreateTime();
             LocalDateTime cutoff = LocalDateTime.now().minusSeconds(resolvedPaymentTimeoutSeconds());
             if (!createTime.isAfter(cutoff)) {
                 UpdateWrapper<Order> cancelWrapper = new UpdateWrapper<>();
@@ -250,12 +249,12 @@ public class OrderServiceImpl implements OrderService {
                 if (cancelled > 0) {
                     restoreSkuStock(dbOrder);
                 }
-                log.info("buyOrder timeout cancel orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", orderId, userId, dbOrder.getSkuId(), dbOrder.getQuantity(), dbOrder.getCreateTime(), cutoff.format(DATE_TIME_FORMATTER));
+                log.info("buyOrder timeout cancel orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", orderId, userId, dbOrder.getSkuId(), dbOrder.getQuantity(), dbOrder.getCreateTime(), cutoff);
                 return Result.failure("订单已超时自动取消");
             }
         } catch (Exception e) {
-            log.error("buyOrder parse createTime failed, orderId={}, createTime={}", orderId, dbOrder.getCreateTime(), e);
-            return Result.failure("订单创建时间解析失败");
+            log.error("buyOrder process failed, orderId={}, createTime={}", orderId, dbOrder.getCreateTime(), e);
+            return Result.failure("订单处理失败");
         }
 
         UpdateWrapper<Order> updateWrapper = new UpdateWrapper<>();
@@ -266,6 +265,24 @@ public class OrderServiceImpl implements OrderService {
         if (updated <= 0) {
             return Result.failure("支付失败，请刷新后重试");
         }
+用户支付订单后client.update(request, RequestOptions.DEFAULT);语句报错：java.net.ConnectException: Connection refused: no further information
+        try {
+            Integer quantity = dbOrder.getQuantity();
+            if (quantity == null || quantity <= 0) {
+                quantity = 1;
+            }
+            Map<String, Object> salesMessage = new HashMap<>();
+            salesMessage.put("productId", dbOrder.getProductId());
+            salesMessage.put("skuId", dbOrder.getSkuId());
+            salesMessage.put("quantity", quantity);
+            rabbitTemplate.convertAndSend("sales.exchange", "sales.update", salesMessage);
+            log.info("Sent sales update message, orderId={}, productId={}, skuId={}, quantity={}",
+                    orderId, dbOrder.getProductId(), dbOrder.getSkuId(), quantity);
+        } catch (Exception e) {
+            log.error("Failed to send sales update message, orderId={}, productId={}, skuId={}, quantity={}",
+                    orderId, dbOrder.getProductId(), dbOrder.getSkuId(), dbOrder.getQuantity(), e);
+        }
+
         return Result.success(null);
     }
 
@@ -304,10 +321,10 @@ public class OrderServiceImpl implements OrderService {
             });
         }
         queryWrapper.eq("user_id", searchDto.getUserId());
-        if (StringUtils.hasText(searchDto.getStartTime())) {
+        if (searchDto.getStartTime() != null) {
             queryWrapper.ge("create_time", searchDto.getStartTime());
         }
-        if (StringUtils.hasText(searchDto.getEndTime())) {
+        if (searchDto.getEndTime() != null) {
             queryWrapper.le("create_time", searchDto.getEndTime());
         }
 
@@ -561,12 +578,12 @@ public class OrderServiceImpl implements OrderService {
         if (dbOrder.getStatus() == null || dbOrder.getStatus() != OrderStatusEnum.DUE.getCode()) {
             return Result.failure("订单状态不可取消");
         }
-        if (!StringUtils.hasText(dbOrder.getCreateTime())) {
+        if (dbOrder.getCreateTime() == null) {
             return Result.failure("订单创建时间缺失");
         }
 
-        String cutoffStr = LocalDateTime.now().minusSeconds(resolvedPaymentTimeoutSeconds()).format(DATE_TIME_FORMATTER);
-        if (dbOrder.getCreateTime().compareTo(cutoffStr) > 0) {
+        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(resolvedPaymentTimeoutSeconds());
+        if (dbOrder.getCreateTime().isAfter(cutoff)) {
             return Result.failure("订单未超时");
         }
 
@@ -593,11 +610,10 @@ public class OrderServiceImpl implements OrderService {
                 return;
             }
             LocalDateTime cutoff = LocalDateTime.now().minusSeconds(resolvedPaymentTimeoutSeconds());
-            String cutoffStr = cutoff.format(DATE_TIME_FORMATTER);
 
             QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
             queryWrapper.eq("status", OrderStatusEnum.DUE.getCode())
-                    .le("create_time", cutoffStr);
+                    .le("create_time", cutoff);
             List<Order> overdueOrders = orderMapper.selectList(queryWrapper);
             if (overdueOrders == null || overdueOrders.isEmpty()) {
                 return;
@@ -614,7 +630,7 @@ public class OrderServiceImpl implements OrderService {
                 int updated = orderMapper.update(null, updateWrapper);
                 if (updated > 0) {
                     restoreSkuStock(overdue);
-                    log.info("cancelTimeoutOrders orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", overdue.getId(), overdue.getUserId(), overdue.getSkuId(), overdue.getQuantity(), overdue.getCreateTime(), cutoffStr);
+                    log.info("cancelTimeoutOrders orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", overdue.getId(), overdue.getUserId(), overdue.getSkuId(), overdue.getQuantity(), overdue.getCreateTime(), cutoff);
                 }
             }
         } catch (InterruptedException e) {
@@ -699,7 +715,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             order.setStatus(OrderStatusEnum.DUE.getCode());
-            order.setCreateTime(LocalDateTime.now().format(DATE_TIME_FORMATTER));
+            order.setCreateTime(LocalDateTime.now());
         
             orderMapper.insert(order);
 
@@ -787,10 +803,10 @@ public class OrderServiceImpl implements OrderService {
         if (searchDto.getOrderId() != null) {
             queryWrapper.eq("id", searchDto.getOrderId());
         }
-        if (StringUtils.hasText(searchDto.getStartTime())) {
+        if (searchDto.getStartTime() != null) {
             queryWrapper.ge("create_time", searchDto.getStartTime());
         }
-        if (StringUtils.hasText(searchDto.getEndTime())) {
+        if (searchDto.getEndTime() != null) {
             queryWrapper.le("create_time", searchDto.getEndTime());
         }
         queryWrapper.orderByDesc("id");

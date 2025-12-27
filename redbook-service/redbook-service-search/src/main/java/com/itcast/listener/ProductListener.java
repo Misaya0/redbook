@@ -2,7 +2,6 @@ package com.itcast.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itcast.constant.MqConstant;
-import com.itcast.model.doc.ProductDoc;
 import com.itcast.model.dto.ProductEsDTO;
 import com.itcast.model.dto.ProductSyncMessage;
 import lombok.extern.slf4j.Slf4j;

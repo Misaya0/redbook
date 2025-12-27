@@ -2,12 +2,15 @@ package com.itcast.model.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.itcast.config.ShardingSphereLocalDateTimeTypeHandler;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Data
-@TableName("rb_note_browse")
+@TableName(value = "rb_note_browse", autoResultMap = true)
 public class NoteBrowse implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -26,6 +29,7 @@ public class NoteBrowse implements Serializable {
     /**
      * 浏览时间
      */
-    @TableField("time")
-    private String time;
+    @TableField(value = "time", typeHandler = ShardingSphereLocalDateTimeTypeHandler.class)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime time;
 }

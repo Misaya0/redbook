@@ -36,20 +36,12 @@ export const searchApi = {
   },
 
   // 获取热搜榜单
-  getHotList: async (type) => {
-    try {
-      return await request({
-        url: '/search/hot',
-        method: 'get',
-        params: { type },
-        skipErrorHandler: true
-      })
-    } catch (e) {
-      return request({
-        url: '/search/getHotList',
-        method: 'get',
-        params: { type }
-      })
-    }
+// 获取热搜榜单
+  getHotList: (type) => {
+    return request({
+      url: '/search/getHotList',
+      method: 'get',
+      params: { type }
+    })
   }
 }

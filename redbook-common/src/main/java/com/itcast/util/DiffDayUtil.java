@@ -1,39 +1,34 @@
 package com.itcast.util;
 
-import java.util.Calendar;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.time.ZoneId;
 
 /**
  * 日期天数差工具类
  */
 public class DiffDayUtil {
 
-    public static int diffDays(Date date1, Date date2) {
-        Calendar cal1 = Calendar.getInstance();
-        cal1.setTime(date1);
-
-        Calendar cal2 = Calendar.getInstance();
-        cal2.setTime(date2);
-
-        int day1 = cal1.get(Calendar.DAY_OF_YEAR);
-        int day2 = cal2.get(Calendar.DAY_OF_YEAR);
-
-        int year1 = cal1.get(Calendar.YEAR);
-        int year2 = cal2.get(Calendar.YEAR);
-
-        if(year1 != year2) {
-            int timeDistance = 0 ;
-            for(int i = year1 ; i < year2 ; i++) {
-                if(i % 4 == 0 && i % 100 != 0 || i % 400 == 0) {
-                    timeDistance += 366;
-                }
-                else {
-                    timeDistance += 365;
-                }
-            }
-            return timeDistance + (day2-day1) ;
-        } else {
-            return day2-day1;
+    /**
+     * 计算两个 LocalDateTime 之间的天数差
+     */
+    public static int diffDays(LocalDateTime date1, LocalDateTime date2) {
+        if (date1 == null || date2 == null) {
+            return 0;
         }
+        return (int) ChronoUnit.DAYS.between(date1.toLocalDate(), date2.toLocalDate());
+    }
+
+    /**
+     * 计算两个 Date 之间的天数差 (兼容旧代码)
+     */
+    public static int diffDays(Date date1, Date date2) {
+        if (date1 == null || date2 == null) {
+            return 0;
+        }
+        LocalDateTime ldt1 = date1.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        LocalDateTime ldt2 = date2.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        return diffDays(ldt1, ldt2);
     }
 }

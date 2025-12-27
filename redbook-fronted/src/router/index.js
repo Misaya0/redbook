@@ -20,6 +20,7 @@ import ProductPublish from '@/views/Merchant/ProductPublish.vue'
 import OrderList from '@/views/Order/OrderList.vue'
 import OrderListMerchant from '@/views/Order/OrderListMerchant.vue'
 import NoteDetail from '@/views/NoteDetail.vue'
+import ShopDetail from '@/views/shop/ShopDetail.vue'
 
 const routes = [
   {
@@ -112,6 +113,11 @@ const routes = [
     path: '/user/:id',
     name: 'UserProfile',
     component: UserProfile
+  },
+  {
+    path: '/shop/:id',
+    name: 'ShopDetail',
+    component: ShopDetail
   },
   {
     path: '/follow',

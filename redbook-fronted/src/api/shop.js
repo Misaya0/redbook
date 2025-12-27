@@ -27,6 +27,15 @@ export const getShopByUserId = (userId) => {
 }
 
 /**
+ * 根据店铺ID获取店铺信息
+ * @param {number} shopId - 店铺ID
+ * @returns {Promise}
+ */
+export const getShopById = (shopId) => {
+  return request.get(`/shop/getShopById/${shopId}`)
+}
+
+/**
  * 获取店铺经营数据 (模拟)
  * @returns {Promise}
  */

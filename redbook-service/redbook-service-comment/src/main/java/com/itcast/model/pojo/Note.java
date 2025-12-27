@@ -83,4 +83,22 @@ public class Note implements Serializable {
      */
     @TableField("user_id")
     private Long userId;
+
+    /**
+     * 关联商品ID
+     */
+    @TableField("product_id")
+    private Long productId;
+
+    /**
+     * 关联店铺ID
+     */
+    @TableField("shop_id")
+    private Long shopId;
+
+    /**
+     * 挂链状态: 0-待审, 1-正常, 2-拒绝
+     */
+    @TableField("product_link_status")
+    private Integer productLinkStatus;
 }

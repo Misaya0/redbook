@@ -39,4 +39,9 @@ public class CommentVo extends Comment {
      * 回复目标用户昵称
      */
     private String replyToUser;
+
+    /**
+     * 该笔记的总评论数（包含所有层级）
+     */
+    private Integer totalCount;
 }

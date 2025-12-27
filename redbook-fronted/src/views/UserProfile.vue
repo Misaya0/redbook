@@ -48,6 +48,21 @@
           </div>
         </div>
 
+        <!-- 店铺入口卡片 -->
+        <div v-if="shopInfo" class="shop-card" @click="router.push(`/shop/${shopInfo.id}`)">
+          <div class="shop-left">
+            <el-icon class="shop-icon"><Shop /></el-icon>
+            <div class="shop-titles">
+              <span class="shop-label">店铺</span>
+              <span class="shop-sub">进店逛逛</span>
+            </div>
+          </div>
+          <div class="shop-right">
+            <span class="shop-name">{{ shopInfo.name }}</span>
+            <img :src="getImageUrl(shopInfo.image)" class="shop-avatar-img" />
+          </div>
+        </div>
+
         <div class="action-row">
           <button
               class="follow-btn"
@@ -189,6 +204,7 @@ import {getUserById, isAttention, toggleAttention, getAttentionList, getFansList
 import { getNoteListByUserId, getNoteListByCollectionUserId } from '@/api/note'
 import { getShopByUserId } from '@/api/shop'
 import { getProductsByShop } from '@/api/product'
+import { Shop } from '@element-plus/icons-vue'
 import PostCard from '@/components/PostCard.vue'
 import NoteDetailModal from '@/components/NoteDetailModal.vue'
 import { getImageUrl } from '@/utils/image'
@@ -269,19 +285,21 @@ const fetchUserInfo = async () => {
     if (res) {
       userInfo.value = res
       
-      // 如果是商家，获取店铺信息并默认展示商品Tab
+      // 如果是商家，获取店铺信息
       if (res.role === 1) {
         try {
           const shopRes = await getShopByUserId(res.id)
           if (shopRes) {
             shopInfo.value = shopRes
+            // 如果是商家，默认展示商品Tab
             currentTab.value = 'products'
-            // 切换到商品Tab后立即加载商品列表
-            loadList()
           }
         } catch (e) {
           console.error('获取店铺信息失败', e)
         }
+      } else {
+        // 普通用户默认展示笔记Tab
+        currentTab.value = 'notes'
       }
       
       // 检查关注状态
@@ -410,13 +428,23 @@ const loadList = async (isLoadMore = false) => {
 
   try {
     if (currentTab.value === 'products') {
+      // 确保有店铺信息
+      if (!shopInfo.value && userInfo.value.role === 1) {
+        const shopRes = await getShopByUserId(userId.value)
+        if (shopRes) {
+          shopInfo.value = shopRes
+        }
+      }
+
       if (!shopInfo.value) {
         listLoading.value = false
         return
       }
+
       if (!isLoadMore) {
+        // 调用店铺商品列表接口
         const res = await getProductsByShop(shopInfo.value.id)
-        productsList.value = res || []
+        productsList.value = Array.isArray(res) ? res : []
         hasMore.value = false
       }
     } else {
@@ -480,16 +508,20 @@ const handleNoteClick = (note) => {
 }
 
 // 初始化和监听
-const initData = () => {
+const initData = async () => {
   if (userId.value) {
     // 重置列表数据
     notesList.value = []
     collectionList.value = []
+    productsList.value = []
     page.value = 1
     hasMore.value = true
-    currentTab.value = 'notes'
-
-    fetchUserInfo()
+    
+    // 先获取用户信息和店铺信息
+    await fetchUserInfo()
+    
+    // fetchUserInfo 内部会根据用户身份设置 currentTab
+    // 获取完信息后再加载列表
     loadList()
   } else {
     error.value = '无效的用户ID'
@@ -592,6 +624,68 @@ watch(() => route.params.id, (newId) => {
   display: flex;
   justify-content: space-around;
   margin-bottom: 20px;
+}
+
+.shop-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f7fa;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.shop-card:hover {
+  background-color: #edf0f5;
+}
+
+.shop-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop-icon {
+  font-size: 20px;
+  color: #333;
+}
+
+.shop-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.shop-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.shop-sub {
+  font-size: 12px;
+  color: #999;
+}
+
+.shop-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shop-name {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.shop-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .stat-item {

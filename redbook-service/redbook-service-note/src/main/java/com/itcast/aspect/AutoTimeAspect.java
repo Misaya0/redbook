@@ -8,8 +8,7 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 自动时间填充
@@ -37,11 +36,17 @@ public class AutoTimeAspect {
         Object entity = args[0];
         // 3.使用反射获取setter方法
         try {
-            Method setTime = entity.getClass().getDeclaredMethod("setTime", String.class);
-            // 4.设置值
-            setTime.invoke(entity, new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
+            try {
+                // 尝试 LocalDateTime 格式
+                Method setTime = entity.getClass().getDeclaredMethod("setTime", LocalDateTime.class);
+                setTime.invoke(entity, LocalDateTime.now());
+            } catch (NoSuchMethodException e) {
+                // 回退到 String 格式 (针对未迁移的实体)
+                Method setTime = entity.getClass().getDeclaredMethod("setTime", String.class);
+                setTime.invoke(entity, LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            }
         } catch (Exception e) {
-            log.error("发生异常",e);
+            log.error("自动填充时间异常: entity={}, error={}", entity.getClass().getSimpleName(), e.getMessage());
         }
     }
 }

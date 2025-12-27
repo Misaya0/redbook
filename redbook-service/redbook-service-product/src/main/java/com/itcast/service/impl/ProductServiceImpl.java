@@ -265,7 +265,7 @@ public class ProductServiceImpl implements ProductService {
         if (createTime == null) {
             createTime = LocalDateTime.now();
         }
-        dto.setCreateTime(createTime.format(PRODUCT_TIME_FORMATTER));
+        dto.setCreateTime(createTime);
 
         return dto;
     }
@@ -277,6 +277,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = new Product();
         BeanUtils.copyProperties(productDto, product);
         product.setStatus(1); // 默认上架
+        product.setSales(0); // 初始化销量为0
         product.setCreateTime(java.time.LocalDateTime.now());
         product.setUpdateTime(java.time.LocalDateTime.now());
         productMapper.insert(product);

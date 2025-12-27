@@ -37,7 +37,7 @@ public class ShopServiceImpl implements ShopService {
 
         // 2. 创建店铺
         shop.setUserId(userId);
-        shop.setTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        shop.setTime(LocalDateTime.now());
         shop.setFans(0);
         shop.setSales(0);
         
