@@ -265,7 +265,6 @@ public class OrderServiceImpl implements OrderService {
         if (updated <= 0) {
             return Result.failure("支付失败，请刷新后重试");
         }
-用户支付订单后client.update(request, RequestOptions.DEFAULT);语句报错：java.net.ConnectException: Connection refused: no further information
         try {
             Integer quantity = dbOrder.getQuantity();
             if (quantity == null || quantity <= 0) {
