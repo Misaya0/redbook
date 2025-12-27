@@ -40,6 +40,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -57,6 +58,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 public class ProductServiceImpl implements ProductService {
 
     private static final DateTimeFormatter PRODUCT_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String SKU_STOCK_KEY_PREFIX = "product:stock:";
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -266,6 +268,7 @@ public class ProductServiceImpl implements ProductService {
             createTime = LocalDateTime.now();
         }
         dto.setCreateTime(createTime);
+        dto.setCreateTimeMillis(createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
 
         return dto;
     }
@@ -273,43 +276,62 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<Void> postProduct(ProductDto productDto) {
-        // 1.上传商品 (SPU)
-        Product product = new Product();
-        BeanUtils.copyProperties(productDto, product);
-        product.setStatus(1); // 默认上架
-        product.setSales(0); // 初始化销量为0
-        product.setCreateTime(java.time.LocalDateTime.now());
-        product.setUpdateTime(java.time.LocalDateTime.now());
-        productMapper.insert(product);
+        List<Long> createdSkuIds = new ArrayList<>();
+        try {
+            // 1.上传商品 (SPU)
+            Product product = new Product();
+            BeanUtils.copyProperties(productDto, product);
+            product.setStatus(1); // 默认上架
+            product.setSales(0); // 初始化销量为0
+            product.setCreateTime(java.time.LocalDateTime.now());
+            product.setUpdateTime(java.time.LocalDateTime.now());
+            productMapper.insert(product);
 
-        // 2.上传商品属性 (MongoDB, 兼容旧版)
-        ProductAttribute productAttribute = productDto.getProductAttribute();
-        if (productAttribute != null) {
-            productAttribute.setProduct_id(product.getId());
-            mongoTemplate.insert(productAttribute);
-        }
-
-        // 3. 上传 SKU (新版)
-        if (productDto.getSkus() != null && !productDto.getSkus().isEmpty()) {
-            for (com.itcast.model.pojo.Sku sku : productDto.getSkus()) {
-                sku.setProductId(product.getId());
-                // 如果没有图片，使用 SPU 主图
-                if (!StringUtils.hasText(sku.getImage())) {
-                    sku.setImage(product.getMainImage());
-                }
-                sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
-                skuMapper.insert(sku);
+            // 2.上传商品属性 (MongoDB, 兼容旧版)
+            ProductAttribute productAttribute = productDto.getProductAttribute();
+            if (productAttribute != null) {
+                productAttribute.setProduct_id(product.getId());
+                mongoTemplate.insert(productAttribute);
             }
+
+            // 3. 上传 SKU (新版)
+            if (productDto.getSkus() != null && !productDto.getSkus().isEmpty()) {
+                for (com.itcast.model.pojo.Sku sku : productDto.getSkus()) {
+                    sku.setProductId(product.getId());
+                    if (!StringUtils.hasText(sku.getImage())) {
+                        sku.setImage(product.getMainImage());
+                    }
+                    sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
+                    skuMapper.insert(sku);
+
+                    if (sku.getId() != null) {
+                        createdSkuIds.add(sku.getId());
+                        Integer stock = sku.getStock() == null ? 0 : sku.getStock();
+                        stringRedisTemplate.opsForValue().set(SKU_STOCK_KEY_PREFIX + sku.getId(), String.valueOf(stock));
+                    }
+                }
+            }
+
+            // 4. 发送 MQ 消息通知 Search 服务 (可选) -> 现在实现了
+            sendProductSyncMessage(product, "save");
+
+            return Result.success(null);
+        } catch (Exception e) {
+            try {
+                for (Long skuId : createdSkuIds) {
+                    if (skuId == null) {
+                        continue;
+                    }
+                    stringRedisTemplate.delete(SKU_STOCK_KEY_PREFIX + skuId);
+                }
+            } catch (Exception ignored) {
+            }
+            throw e;
         }
-        
-        // 4. 发送 MQ 消息通知 Search 服务 (可选) -> 现在实现了
-        sendProductSyncMessage(product, "save");
-        
-        return Result.success(null);
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> updateProduct(ProductDto productDto) {
         // 1. 更新 SPU
         Product product = new Product();
@@ -334,40 +356,89 @@ public class ProductServiceImpl implements ProductService {
 
             // 2.1 删除: db中有但input中没有
             List<Long> toDelete = dbSkuIds.stream().filter(id -> !inputSkuIds.contains(id)).collect(Collectors.toList());
-            if (!toDelete.isEmpty()) {
-                skuMapper.deleteBatchIds(toDelete);
-            }
-
-            // 2.2 更新或新增
-            List<BigDecimal> prices = new ArrayList<>();
-            for (Sku sku : productDto.getSkus()) {
-                sku.setProductId(product.getId());
-                if (!StringUtils.hasText(sku.getImage())) {
-                    sku.setImage(product.getMainImage());
-                }
-                sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
-                
-                if (sku.getPrice() != null) {
-                    prices.add(sku.getPrice());
+            Map<Long, String> redisBackup = new LinkedHashMap<>();
+            List<Long> createdSkuIds = new ArrayList<>();
+            try {
+                if (!toDelete.isEmpty()) {
+                    for (Long skuId : toDelete) {
+                        if (skuId == null) {
+                            continue;
+                        }
+                        String key = SKU_STOCK_KEY_PREFIX + skuId;
+                        redisBackup.put(skuId, stringRedisTemplate.opsForValue().get(key));
+                        stringRedisTemplate.delete(key);
+                    }
+                    skuMapper.deleteBatchIds(toDelete);
                 }
 
-                if (sku.getId() != null && dbSkuIds.contains(sku.getId())) {
-                    skuMapper.updateById(sku);
-                } else {
-                    sku.setId(null); // 确保是新增
-                    skuMapper.insert(sku);
+                // 2.2 更新或新增
+                List<BigDecimal> prices = new ArrayList<>();
+                for (Sku sku : productDto.getSkus()) {
+                    sku.setProductId(product.getId());
+                    if (!StringUtils.hasText(sku.getImage())) {
+                        sku.setImage(product.getMainImage());
+                    }
+                    sku.setSpecs(normalizeSpecsJson(sku.getSpecs()));
+
+                    if (sku.getPrice() != null) {
+                        prices.add(sku.getPrice());
+                    }
+
+                    if (sku.getId() != null && dbSkuIds.contains(sku.getId())) {
+                        if (sku.getStock() != null) {
+                            Long skuId = sku.getId();
+                            String key = SKU_STOCK_KEY_PREFIX + skuId;
+                            if (!redisBackup.containsKey(skuId)) {
+                                redisBackup.put(skuId, stringRedisTemplate.opsForValue().get(key));
+                            }
+                            stringRedisTemplate.opsForValue().set(key, String.valueOf(sku.getStock()));
+                        }
+                        skuMapper.updateById(sku);
+                    } else {
+                        sku.setId(null); // 确保是新增
+                        skuMapper.insert(sku);
+                        if (sku.getId() != null) {
+                            createdSkuIds.add(sku.getId());
+                            Integer stock = sku.getStock() == null ? 0 : sku.getStock();
+                            stringRedisTemplate.opsForValue().set(SKU_STOCK_KEY_PREFIX + sku.getId(), String.valueOf(stock));
+                        }
+                    }
                 }
-            }
             
-            // 2.3 更新商品主表价格（取SKU最低价）
-            if (!prices.isEmpty()) {
-                BigDecimal minPrice = prices.stream().min(BigDecimal::compareTo).orElse(null);
-                if (minPrice != null) {
-                    Product updatePrice = new Product();
-                    updatePrice.setId(product.getId());
-                    updatePrice.setPrice(minPrice.doubleValue());
-                    productMapper.updateById(updatePrice);
+                // 2.3 更新商品主表价格（取SKU最低价）
+                if (!prices.isEmpty()) {
+                    BigDecimal minPrice = prices.stream().min(BigDecimal::compareTo).orElse(null);
+                    if (minPrice != null) {
+                        Product updatePrice = new Product();
+                        updatePrice.setId(product.getId());
+                        updatePrice.setPrice(minPrice.doubleValue());
+                        productMapper.updateById(updatePrice);
+                    }
                 }
+            } catch (Exception e) {
+                try {
+                    for (Map.Entry<Long, String> entry : redisBackup.entrySet()) {
+                        Long skuId = entry.getKey();
+                        if (skuId == null) {
+                            continue;
+                        }
+                        String key = SKU_STOCK_KEY_PREFIX + skuId;
+                        String oldValue = entry.getValue();
+                        if (oldValue == null) {
+                            stringRedisTemplate.delete(key);
+                        } else {
+                            stringRedisTemplate.opsForValue().set(key, oldValue);
+                        }
+                    }
+                    for (Long skuId : createdSkuIds) {
+                        if (skuId == null) {
+                            continue;
+                        }
+                        stringRedisTemplate.delete(SKU_STOCK_KEY_PREFIX + skuId);
+                    }
+                } catch (Exception ignored) {
+                }
+                throw e;
             }
         }
         
@@ -431,6 +502,22 @@ public class ProductServiceImpl implements ProductService {
         }
         if (searchDto.getCategoryId() != null) {
             queryWrapper.eq(Product::getCategoryId, searchDto.getCategoryId());
+        }
+
+        String sort = searchDto.getSort();
+        String order = searchDto.getOrder();
+        if (!StringUtils.hasText(sort) || "default".equalsIgnoreCase(sort)) {
+            queryWrapper.orderByDesc(Product::getCreateTime).orderByDesc(Product::getId);
+        } else if ("sales".equalsIgnoreCase(sort)) {
+            queryWrapper.orderByDesc(Product::getSales).orderByDesc(Product::getId);
+        } else if ("price".equalsIgnoreCase(sort)) {
+            if ("desc".equalsIgnoreCase(order)) {
+                queryWrapper.orderByDesc(Product::getPrice).orderByDesc(Product::getId);
+            } else {
+                queryWrapper.orderByAsc(Product::getPrice).orderByDesc(Product::getId);
+            }
+        } else {
+            queryWrapper.orderByDesc(Product::getCreateTime).orderByDesc(Product::getId);
         }
 
         Page<Product> productPage = productMapper.selectPage(page, queryWrapper);
@@ -612,10 +699,18 @@ public class ProductServiceImpl implements ProductService {
                         if (inferred == null || !StringUtils.hasText(inferred.getValue())) {
                             continue;
                         }
+                        SpecOption raw = optionByValueOrLabel.get(inferred.getValue());
+                        String displayLabel = inferred.getLabel();
+                        if (!StringUtils.hasText(displayLabel)) {
+                            displayLabel = inferred.getValue();
+                        }
+                        if (raw != null && StringUtils.hasText(raw.getOptionLabel())) {
+                            displayLabel = raw.getOptionLabel();
+                        }
+
                         SpecOptionVo optVo = new SpecOptionVo();
                         optVo.setValue(inferred.getValue());
-                        optVo.setLabel(inferred.getLabel());
-                        SpecOption raw = optionByValueOrLabel.get(inferred.getValue());
+                        optVo.setLabel(displayLabel);
                         if (raw != null && StringUtils.hasText(raw.getImage())) {
                             optVo.setImage(raw.getImage());
                         }
@@ -628,8 +723,10 @@ public class ProductServiceImpl implements ProductService {
             } else {
                 optVos = optList.stream().map(opt -> {
                     SpecOptionVo optVo = new SpecOptionVo();
-                    optVo.setValue(opt.getOptionValue());
-                    optVo.setLabel(opt.getOptionLabel());
+                    String value = StringUtils.hasText(opt.getOptionValue()) ? opt.getOptionValue() : opt.getOptionLabel();
+                    String label = StringUtils.hasText(opt.getOptionLabel()) ? opt.getOptionLabel() : opt.getOptionValue();
+                    optVo.setValue(value);
+                    optVo.setLabel(label);
                     optVo.setImage(opt.getImage());
                     return optVo;
                 }).collect(Collectors.toList());

@@ -35,6 +35,9 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
+import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -229,6 +232,31 @@ public class SearchServiceImpl implements SearchService {
         }
 
         sourceBuilder.query(boolQuery);
+
+        String sort = searchDto == null ? null : searchDto.getSort();
+        String order = searchDto == null ? null : searchDto.getOrder();
+        if (StringUtils.isBlank(sort) || "default".equalsIgnoreCase(sort)) {
+            FieldSortBuilder createTimeSort = SortBuilders.fieldSort("createTime")
+                    .order(SortOrder.DESC)
+                    .unmappedType("long")
+                    .missing("_last");
+            sourceBuilder.sort(createTimeSort);
+            sourceBuilder.sort("id", SortOrder.DESC);
+        } else if ("sales".equalsIgnoreCase(sort)) {
+            sourceBuilder.sort("sales", SortOrder.DESC);
+            sourceBuilder.sort("id", SortOrder.DESC);
+        } else if ("price".equalsIgnoreCase(sort)) {
+            SortOrder priceOrder = "desc".equalsIgnoreCase(order) ? SortOrder.DESC : SortOrder.ASC;
+            sourceBuilder.sort("price", priceOrder);
+            sourceBuilder.sort("id", SortOrder.DESC);
+        } else {
+            FieldSortBuilder createTimeSort = SortBuilders.fieldSort("createTime")
+                    .order(SortOrder.DESC)
+                    .unmappedType("long")
+                    .missing("_last");
+            sourceBuilder.sort(createTimeSort);
+            sourceBuilder.sort("id", SortOrder.DESC);
+        }
 
         // Paging
         int page = searchDto.getPageNum() == null ? 1 : searchDto.getPageNum();

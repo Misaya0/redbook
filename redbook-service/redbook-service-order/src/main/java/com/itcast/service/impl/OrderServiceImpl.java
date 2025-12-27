@@ -175,7 +175,7 @@ public class OrderServiceImpl implements OrderService {
             if (deductResult == null) {
                 return Result.failure("扣减库存失败");
             }
-            if (deductResult.longValue() != 1L) {
+            if (deductResult != 1L) {
                 return Result.failure("库存不足");
             }
             stockDeducted = true;

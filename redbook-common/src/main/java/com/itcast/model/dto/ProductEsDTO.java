@@ -16,4 +16,5 @@ public class ProductEsDTO {
     private Long categoryId;
     private String image;
     private LocalDateTime createTime;
+    private Long createTimeMillis;
 }

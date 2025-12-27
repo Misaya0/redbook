@@ -11,4 +11,6 @@ public class ProductSearchDto {
     private Double maxPrice;
     private Integer shopId;
     private Long categoryId;
+    private String sort;
+    private String order;
 }

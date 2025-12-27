@@ -65,13 +65,6 @@
           </div>
           <div 
             class="filter-item" 
-            :class="{ active: sortType === 'new' }" 
-            @click="handleSort('new')"
-          >
-            新品
-          </div>
-          <div 
-            class="filter-item" 
             :class="{ active: sortType === 'price' }" 
             @click="handleSort('price')"
           >
@@ -143,7 +136,7 @@ const router = useRouter()
 
 // 状态
 const shopId = ref(route.params.id)
-const sortType = ref('default') // default, sales, new, price
+const sortType = ref('default') // default, sales, price
 const priceOrder = ref('asc') // asc, desc
 const isSticky = ref(false)
 const loading = ref(false)
@@ -247,6 +240,8 @@ const fetchProductList = async (isLoadMore = false) => {
   try {
     const searchDto = {
       shopId: parseInt(shopId.value),
+      sort: sortType.value,
+      order: sortType.value === 'price' ? priceOrder.value : null,
       pageNum: page.value,
       pageSize: pageSize
     }

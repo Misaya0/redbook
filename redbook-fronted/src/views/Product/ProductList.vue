@@ -52,11 +52,57 @@
 
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <div class="filter-item" :class="{ active: sortType === 'default' }" @click="sortType = 'default'">综合</div>
-      <div class="filter-item" :class="{ active: sortType === 'sales' }" @click="sortType = 'sales'">销量</div>
+      <div class="filter-item" :class="{ active: sortType === 'default' }" @click="setSort('default')">综合</div>
+      <div class="filter-item" :class="{ active: sortType === 'sales' }" @click="setSort('sales')">销量</div>
       <div class="filter-item" :class="{ active: sortType === 'price' }" @click="togglePriceSort">
         价格
         <span class="sort-icon">{{ priceSortIcon }}</span>
+      </div>
+      <div
+        ref="rangeTriggerRef"
+        class="filter-item range-trigger"
+        :class="{ active: isRangeActive, open: showRangePopover }"
+        @click.stop="toggleRangePopover"
+      >
+        区间
+        <span class="range-arrow">▾</span>
+      </div>
+
+      <div
+        v-if="showRangePopover"
+        ref="rangePopoverRef"
+        class="range-popover"
+        @click.stop
+      >
+        <div class="range-input-row">
+          <input
+            v-model.trim="rangeMinInput"
+            class="range-input"
+            inputmode="decimal"
+            placeholder="最低价"
+            @keyup.enter="handleRangeConfirm"
+          />
+          <span class="range-sep">—</span>
+          <input
+            v-model.trim="rangeMaxInput"
+            class="range-input"
+            inputmode="decimal"
+            placeholder="最高价"
+            @keyup.enter="handleRangeConfirm"
+          />
+        </div>
+
+        <div class="range-preset-list">
+          <button type="button" class="range-preset" @click="applyPreset(0, 500)">0-500</button>
+          <button type="button" class="range-preset" @click="applyPreset(500, 2000)">500-2000</button>
+          <button type="button" class="range-preset" @click="applyPreset(2000, 5000)">2000-5000</button>
+          <button type="button" class="range-preset" @click="applyPreset(5000, null)">>5000</button>
+        </div>
+
+        <div class="range-action-row">
+          <button type="button" class="range-btn ghost" @click="handleRangeReset">重置</button>
+          <button type="button" class="range-btn primary" @click="handleRangeConfirm">确定</button>
+        </div>
       </div>
     </div>
 
@@ -112,7 +158,7 @@
 </template>
 
 <script setup>
-import {ref, computed, onMounted, watch} from 'vue'
+import {ref, computed, onMounted, onUnmounted, watch} from 'vue'
 import {useRouter, useRoute} from 'vue-router'
 import {searchProduct, getCategoryList} from '@/api/product'
 import {getImageUrl} from '@/utils/image'
@@ -132,6 +178,14 @@ const hasMore = ref(true)
 const sortType = ref('default') // default, sales, price
 const priceSortOrder = ref('asc') // asc, desc
 
+const minPrice = ref(null)
+const maxPrice = ref(null)
+const showRangePopover = ref(false)
+const rangeMinInput = ref('')
+const rangeMaxInput = ref('')
+const rangeTriggerRef = ref(null)
+const rangePopoverRef = ref(null)
+
 // 分类相关状态
 const categoryLevel1 = ref([])
 const categoryLevel2 = ref([])
@@ -144,6 +198,83 @@ const priceSortIcon = computed(() => {
   if (sortType.value !== 'price') return '↕'
   return priceSortOrder.value === 'asc' ? '↑' : '↓'
 })
+
+const isRangeActive = computed(() => {
+  return minPrice.value != null || maxPrice.value != null
+})
+
+const parsePrice = (raw) => {
+  const text = String(raw ?? '').trim()
+  if (!text) return null
+  const num = Number(text)
+  if (!Number.isFinite(num)) return NaN
+  return num
+}
+
+const toggleRangePopover = () => {
+  showRangePopover.value = !showRangePopover.value
+  if (showRangePopover.value) {
+    rangeMinInput.value = minPrice.value == null ? '' : String(minPrice.value)
+    rangeMaxInput.value = maxPrice.value == null ? '' : String(maxPrice.value)
+  }
+}
+
+const setSort = (type) => {
+  if (type === 'price') return
+  if (sortType.value === type) return
+  sortType.value = type
+  handleSearch()
+}
+
+const applyPreset = (min, max) => {
+  rangeMinInput.value = min == null ? '' : String(min)
+  rangeMaxInput.value = max == null ? '' : String(max)
+}
+
+const handleRangeReset = () => {
+  rangeMinInput.value = ''
+  rangeMaxInput.value = ''
+}
+
+const handleRangeConfirm = () => {
+  const nextMin = parsePrice(rangeMinInput.value)
+  const nextMax = parsePrice(rangeMaxInput.value)
+
+  if (Number.isNaN(nextMin) || Number.isNaN(nextMax)) {
+    ElMessage.warning('请输入正确的价格')
+    return
+  }
+
+  if (nextMin != null && nextMin < 0) {
+    ElMessage.warning('最低价不能小于 0')
+    return
+  }
+  if (nextMax != null && nextMax < 0) {
+    ElMessage.warning('最高价不能小于 0')
+    return
+  }
+  if (nextMin != null && nextMax != null && nextMin > nextMax) {
+    ElMessage.warning('最低价不能大于最高价')
+    return
+  }
+
+  minPrice.value = nextMin
+  maxPrice.value = nextMax
+  showRangePopover.value = false
+  handleSearch()
+}
+
+const handleWindowClick = (e) => {
+  if (!showRangePopover.value) return
+  const triggerEl = rangeTriggerRef.value
+  const popoverEl = rangePopoverRef.value
+  const target = e.target
+
+  if (triggerEl && triggerEl.contains(target)) return
+  if (popoverEl && popoverEl.contains(target)) return
+
+  showRangePopover.value = false
+}
 
 // 方法
 const handleSearch = () => {
@@ -240,6 +371,10 @@ const fetchProducts = async () => {
     const searchDto = {
       keyword: searchKeyword.value,
       categoryId: categoryId.value,
+      minPrice: minPrice.value,
+      maxPrice: maxPrice.value,
+      sort: sortType.value,
+      order: sortType.value === 'price' ? priceSortOrder.value : null,
       pageNum: page.value,
       pageSize: pageSize,
       // 这里可以根据 sortType 扩展后端排序参数
@@ -296,6 +431,12 @@ onMounted(() => {
 
   // 加载分类
   fetchCategories()
+
+  window.addEventListener('click', handleWindowClick, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleWindowClick, true)
 })
 </script>
 
@@ -489,6 +630,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   border-bottom: 1px solid #f0f0f0;
+  position: relative;
 }
 
 .filter-item {
@@ -496,6 +638,7 @@ onMounted(() => {
   text-align: center;
   font-size: 14px;
   color: #666;
+  user-select: none;
 }
 
 .filter-item.active {
@@ -508,23 +651,155 @@ onMounted(() => {
   margin-left: 2px;
 }
 
+.range-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.range-arrow {
+  font-size: 12px;
+  color: #999;
+  transform: translateY(-1px);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.range-trigger.open .range-arrow {
+  transform: translateY(-1px) rotate(180deg);
+  color: #ff2442;
+}
+
+.range-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 10px;
+  right: 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  z-index: 200;
+}
+
+.range-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.range-input {
+  flex: 1;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid #e9e9e9;
+  background: #fafafa;
+  padding: 0 12px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+}
+
+.range-input:focus {
+  border-color: rgba(255, 36, 66, 0.35);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.12);
+}
+
+.range-sep {
+  font-size: 12px;
+  color: #bbb;
+}
+
+.range-preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.range-preset {
+  appearance: none;
+  border: 1px solid rgba(255, 36, 66, 0.18);
+  background: rgba(255, 36, 66, 0.06);
+  color: #ff2442;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.range-preset:active {
+  transform: scale(0.98);
+}
+
+.range-action-row {
+  display: flex;
+  gap: 10px;
+}
+
+.range-btn {
+  flex: 1;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.range-btn.ghost {
+  background: #fff;
+  border: 1px solid #e9e9e9;
+  color: #333;
+}
+
+.range-btn.primary {
+  background: #ff2442;
+  border: 1px solid #ff2442;
+  color: #fff;
+}
+
+.range-btn:active {
+  transform: scale(0.98);
+}
+
+@media (min-width: 768px) {
+  .range-popover {
+    left: auto;
+    right: 12px;
+    width: 340px;
+  }
+}
+
 .product-list-content {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 12px;
 }
 
 .product-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .product-card {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  border: 1px solid #f0f0f0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  }
 }
 
 .image-wrapper {
@@ -540,11 +815,11 @@ onMounted(() => {
 }
 
 .product-info {
-  padding: 8px;
+  padding: 10px;
 }
 
 .product-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
   line-height: 1.4;
   height: 40px;
@@ -553,6 +828,21 @@ onMounted(() => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+@media (min-width: 768px) {
+  .product-list-content {
+    padding: 16px;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .product-title {
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 375px) {
