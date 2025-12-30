@@ -9,6 +9,7 @@ import com.itcast.model.vo.ProductSpecsVo;
 import com.itcast.model.vo.ProductVo;
 import com.itcast.model.vo.SpecGroupVo;
 import com.itcast.result.Result;
+import com.itcast.mapper.ProductMapper;
 import com.itcast.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,12 +30,24 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
+    @Autowired
+    private ProductMapper productMapper;
+
     @Operation(summary = "获取商品列表", description = "获取所有商品列表")
     @GetMapping("/getProductList")
     public Result<List<Product>> getProductList(
             @Parameter(description = "页码") @RequestParam(required = false, defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页大小") @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
         return productService.getProductList(pageNum, pageSize);
+    }
+
+    @Operation(summary = "批量获取商品", description = "根据商品ID列表批量查询商品信息")
+    @PostMapping("/getProductsByIds")
+    public Result<List<Product>> getProductsByIds(@RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.success(java.util.Collections.emptyList());
+        }
+        return Result.success(productMapper.selectBatchIds(ids));
     }
 
     @Operation(summary = "获取商品ES同步列表", description = "用于全量同步到ES的商品列表")

@@ -73,6 +73,20 @@ export const searchProductMySql = (searchDto) => {
 }
 
 /**
+ * 搜索商品（用于发布笔记时关联商品）
+ * @param {Object} data - 搜索条件，例如 { name: "关键词" }
+ * @returns {Promise}
+ */
+export const searchProducts = (data = {}) => {
+  const payload = { ...data }
+  if (payload.name && !payload.keyword) {
+    payload.keyword = payload.name
+  }
+  delete payload.name
+  return request.post('/product/search', payload)
+}
+
+/**
  * 发布商品
  * @param {Object} productDto - 商品信息
  * @returns {Promise}

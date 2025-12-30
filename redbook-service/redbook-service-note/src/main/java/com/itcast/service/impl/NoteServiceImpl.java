@@ -1,8 +1,11 @@
 package com.itcast.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itcast.annotation.SendMessage;
 import com.itcast.client.CommentClient;
+import com.itcast.client.ProductClient;
 import com.itcast.client.UserClient;
 import com.itcast.constant.ExceptionConstant;
 import com.itcast.constant.RedisConstant;
@@ -16,6 +19,7 @@ import com.itcast.enums.LogType;
 import com.itcast.model.pojo.Note;
 import com.itcast.model.pojo.User;
 import com.itcast.model.vo.NoteVo;
+import com.itcast.model.vo.ProductSimpleVo;
 import com.itcast.result.Result;
 import com.itcast.service.NoteService;
 import com.itcast.strategy.GetNotesStrategy;
@@ -35,11 +39,18 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.itcast.util.MinioUtil;
@@ -69,6 +80,9 @@ public class NoteServiceImpl implements NoteService {
     private CommentClient commentClient;
 
     @Autowired
+    private ProductClient productClient;
+
+    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
@@ -88,6 +102,9 @@ public class NoteServiceImpl implements NoteService {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     @SendMessage(type = LogType.SCAN)
@@ -213,7 +230,16 @@ public class NoteServiceImpl implements NoteService {
         } else {
             noteVo.setComment(0);
         }
-        
+
+        // 填充关联商品信息（远程调用失败时降级，不影响笔记主流程）
+        if (note.getProductId() != null) {
+            try {
+                noteVo.setProduct(queryProductSimpleVo(note.getProductId()));
+            } catch (Exception e) {
+                log.error("获取笔记关联商品失败，productId={}", note.getProductId(), e);
+            }
+        }
+
         // 填充点赞数和收藏数 (从Redis实时获取更准确，或者直接使用数据库中的值)
         // 注意：这里直接使用note中的值，如果note来自缓存，可能不是最新的。
         // 如果需要实时性，应该从Redis中获取最新的点赞/收藏数覆盖
@@ -233,7 +259,130 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public Result<List<NoteVo>> getNotes(NoteStrategyType strategyType, NoteStrategyContext context) {
         GetNotesStrategy strategy = strategyFactory.getStrategy(strategyType);
-        return strategy.getNotes(context);
+        Result<List<NoteVo>> result = strategy.getNotes(context);
+        if (result == null || result.getData() == null || result.getData().isEmpty()) {
+            return result;
+        }
+
+        List<NoteVo> noteList = result.getData();
+
+        Set<Long> productIds = new HashSet<>();
+        for (NoteVo noteVo : noteList) {
+            if (noteVo != null && noteVo.getProductId() != null) {
+                productIds.add(noteVo.getProductId());
+            }
+        }
+
+        Map<Long, ProductSimpleVo> productMap = Collections.emptyMap();
+        if (!productIds.isEmpty()) {
+            try {
+                Result<List<ProductSimpleVo>> productResult = productClient.getProductsByIds(new ArrayList<>(productIds));
+                List<ProductSimpleVo> products = productResult == null ? null : productResult.getData();
+                if (products != null && !products.isEmpty()) {
+                    Map<Long, ProductSimpleVo> map = new HashMap<>(products.size() * 2);
+                    for (ProductSimpleVo p : products) {
+                        if (p != null && p.getId() != null) {
+                            map.put(p.getId(), p);
+                        }
+                    }
+                    productMap = map;
+                }
+            } catch (Exception e) {
+                log.error("批量获取商品信息失败，productIds={}", productIds, e);
+            }
+        }
+
+        for (NoteVo noteVo : noteList) {
+            if (noteVo == null || noteVo.getProductId() == null) {
+                continue;
+            }
+            noteVo.setProduct(productMap.get(noteVo.getProductId()));
+        }
+
+        return result;
+    }
+
+    /**
+     * 查询商品服务并转换为笔记侧需要的简要信息
+     * 兼容两种 data 结构：
+     * 1) data 为商品对象本身：{ data: { id,name,mainImage,price,... } }
+     * 2) data 包裹在 product 字段：{ data: { product: { ... } } }
+     */
+    private ProductSimpleVo queryProductSimpleVo(Long productId) {
+        Result<Map<String, Object>> result = productClient.getProduct(productId);
+        if (result == null || result.getData() == null) {
+            return null;
+        }
+
+        Map<String, Object> data = result.getData();
+        Map<String, Object> productMap = resolveProductMap(data);
+        if (productMap == null || productMap.isEmpty()) {
+            return null;
+        }
+
+        ProductSimpleVo vo = new ProductSimpleVo();
+        Long id = toLong(productMap.get("id"));
+        vo.setId(id == null ? productId : id);
+        vo.setName(toStr(productMap.get("name")));
+
+        String mainImage = toStr(productMap.get("mainImage"));
+        if (mainImage == null) {
+            mainImage = toStr(productMap.get("image"));
+        }
+        vo.setMainImage(mainImage);
+
+        vo.setPrice(toBigDecimal(productMap.get("price")));
+
+        if (vo.getName() == null && vo.getMainImage() == null && vo.getPrice() == null) {
+            return null;
+        }
+        return vo;
+    }
+
+    private Map<String, Object> resolveProductMap(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+        if (data.containsKey("product") && data.get("product") != null) {
+            return objectMapper.convertValue(data.get("product"), new TypeReference<Map<String, Object>>() {});
+        }
+        return data;
+    }
+
+    private Long toLong(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof Number) {
+            return ((Number) v).longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String toStr(Object v) {
+        if (v == null) {
+            return null;
+        }
+        String s = String.valueOf(v);
+        return s.isBlank() ? null : s;
+    }
+
+    private BigDecimal toBigDecimal(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof BigDecimal) {
+            return (BigDecimal) v;
+        }
+        try {
+            return new BigDecimal(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Autowired

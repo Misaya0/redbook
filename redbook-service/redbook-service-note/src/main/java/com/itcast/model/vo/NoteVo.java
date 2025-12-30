@@ -15,6 +15,11 @@ public class NoteVo extends Note {
     private User user;
 
     /**
+     * 关联商品（用于前端商品卡片展示）
+     */
+    private ProductSimpleVo product;
+
+    /**
      * 处理后的时间
      */
     private String dealTime;
