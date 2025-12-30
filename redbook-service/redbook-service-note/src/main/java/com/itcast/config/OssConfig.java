@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * oss配置
  */
-@Configuration
+//@Configuration
 public class OssConfig {
 
     @Value("${oss.endpoint}")
