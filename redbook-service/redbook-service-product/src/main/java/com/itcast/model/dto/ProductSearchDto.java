@@ -2,6 +2,8 @@ package com.itcast.model.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProductSearchDto {
     private Integer pageNum = 1;
@@ -11,6 +13,7 @@ public class ProductSearchDto {
     private Double maxPrice;
     private Integer shopId;
     private Long categoryId;
+    private List<Long> categoryIds;
     private String sort;
     private String order;
 }

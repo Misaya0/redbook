@@ -1,19 +1,21 @@
 server:
   port: 8095
 spring:
+  profiles:
+    active: dev
   application:
     name: redbook-service-product
-  cloud:
-    nacos:
-      discovery:
-        server-addr: 10.1.40.66:8848
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
   elasticsearch:
     uris: http://10.1.40.66:9200
     username: admin
     password: 123321
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/rb_product?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://10.1.40.66:3306/rb_product?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 1234
   data:
@@ -28,14 +30,9 @@ spring:
           max-active: 8
           max-idle: 8
           min-idle: 0
-    mongodb:
-    #      host: 10.1.40.66
-    #      port: 27017
-    #      database: redbook
-    #      username: admin
-    #      password: 123321
-    #      authentication-database: admin
-      uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
+    # mongodb:
+    #   MongoDB 当前不使用，避免启动期连接认证失败，先整体禁用（见 spring.autoconfigure.exclude）。
+    #   uri: mongodb://admin:123321@10.1.40.66:27017/redbook?authSource=admin
   rabbitmq:
     host: 10.1.40.66
     port: 5672
@@ -57,6 +54,11 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+minio:
+  endpoint: http://10.1.40.66:9000
+  accessKey: admin
+  secretKey: minio123321
+  bucketName: redbook
 #logging:
 #  pattern:
 #    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - [traceId=%X{traceId}] [req=%X{req}] [uid=%X{uid}] %msg%n"

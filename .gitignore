@@ -40,3 +40,5 @@ buildNumber.properties
 *.ipr
 /redbook-fronted/node_modules/
 /uploads/
+/redbook-fronted/dist/
+/redbook-common/src/main/java/com/itcast/util/WeChatNotifierUtil.java

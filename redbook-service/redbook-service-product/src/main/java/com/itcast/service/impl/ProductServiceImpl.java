@@ -25,19 +25,16 @@ import com.itcast.model.vo.SkuSpecVo;
 import com.itcast.result.Result;
 import com.itcast.service.ProductService;
 import com.itcast.context.UserContext;
+import com.itcast.util.MinioUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import org.springframework.web.multipart.MultipartFile;
-import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -87,8 +84,11 @@ public class ProductServiceImpl implements ProductService {
     @Autowired
     private ProductBrowseMapper productBrowseMapper;
 
+//    @Autowired
+//    private MongoTemplate mongoTemplate;
+
     @Autowired
-    private MongoTemplate mongoTemplate;
+    private MinioUtil minioUtil;
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
@@ -154,22 +154,22 @@ public class ProductServiceImpl implements ProductService {
         // 4.获取店铺信息
         Shop shop = shopMapper.selectById(product.getShopId());
         
-        // 5.获取商品属性 (MongoDB, 兼容旧逻辑)
-        ProductAttribute productAttribute
-                = mongoTemplate.findOne(new Query(Criteria.where("product_id").is(product.getId())), ProductAttribute.class);
+//        // 5.获取商品属性 (MongoDB, 兼容旧逻辑)
+//        ProductAttribute productAttribute
+//                = mongoTemplate.findOne(new Query(Criteria.where("product_id").is(product.getId())), ProductAttribute.class);
         
         // 6.设置vo
         ProductVo productVo = new ProductVo();
         BeanUtils.copyProperties(product, productVo);
         productVo.setShop(shop);
         productVo.setSkus(skus);
-        if (productAttribute != null) productVo.setCustomAttributes(productAttribute.getCustomAttributes());
+//        if (productAttribute != null) productVo.setCustomAttributes(productAttribute.getCustomAttributes());
         
         // 6. 调用 NoteService 获取关联种草笔记 (并行优化或异常降级)
         try {
             Result<List<NoteSimpleVo>> noteResult = noteClient.getRelatedNotes(product.getId());
             if (noteResult != null && noteResult.getData() != null) {
-                // 类型转换 NoteVo -> NoteSimpleVo
+                // 类型转换 NoteVo -> NoteSimpleVoce
                 // 注意：这里需要确保 NoteClient 返回的类型能被正确反序列化，或者做一层转换
                 // 为简化，假设 NoteSimpleVo 兼容 NoteVo 的字段
                 productVo.setRelatedNotes(noteResult.getData());
@@ -274,7 +274,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> postProduct(ProductDto productDto) {
         List<Long> createdSkuIds = new ArrayList<>();
         try {
@@ -287,12 +287,12 @@ public class ProductServiceImpl implements ProductService {
             product.setUpdateTime(java.time.LocalDateTime.now());
             productMapper.insert(product);
 
-            // 2.上传商品属性 (MongoDB, 兼容旧版)
-            ProductAttribute productAttribute = productDto.getProductAttribute();
-            if (productAttribute != null) {
-                productAttribute.setProduct_id(product.getId());
-                mongoTemplate.insert(productAttribute);
-            }
+//            // 2.上传商品属性 (MongoDB, 兼容旧版)
+//            ProductAttribute productAttribute = productDto.getProductAttribute();
+//            if (productAttribute != null) {
+//                productAttribute.setProduct_id(product.getId());
+//                mongoTemplate.insert(productAttribute);
+//            }
 
             // 3. 上传 SKU (新版)
             if (productDto.getSkus() != null && !productDto.getSkus().isEmpty()) {
@@ -500,7 +500,9 @@ public class ProductServiceImpl implements ProductService {
         if (searchDto.getShopId() != null) {
             queryWrapper.eq(Product::getShopId, searchDto.getShopId());
         }
-        if (searchDto.getCategoryId() != null) {
+        if (searchDto.getCategoryIds() != null && !searchDto.getCategoryIds().isEmpty()) {
+            queryWrapper.in(Product::getCategoryId, searchDto.getCategoryIds());
+        } else if (searchDto.getCategoryId() != null) {
             queryWrapper.eq(Product::getCategoryId, searchDto.getCategoryId());
         }
 
@@ -822,25 +824,9 @@ public class ProductServiceImpl implements ProductService {
         if (file.isEmpty()) {
              return Result.failure("文件为空");
         }
-        // 1.获取文件名
-        String originalFilename = file.getOriginalFilename();
-        String suffix = originalFilename != null && originalFilename.contains(".") 
-                ? originalFilename.substring(originalFilename.lastIndexOf(".")) 
-                : ".jpg";
-        String fileName = UUID.randomUUID().toString() + suffix;
-        
-        // 2.创建保存目录
-        String uploadPath = System.getProperty("user.dir") + File.separator + "uploads";
-        File dir = new File(uploadPath);
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-        
-        // 3.保存文件
-        file.transferTo(new File(dir, fileName));
-        
-        // 4.返回访问URL
-        return Result.success("/product/uploads/" + fileName);
+        // 上传图片到 MinIO，返回可访问的完整 URL
+        String url = minioUtil.upload(file);
+        return Result.success(url);
     }
 
     @Override

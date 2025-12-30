@@ -1,15 +1,13 @@
 server:
   port: 8080
 spring:
+  profiles:
+    active: dev
   application:
     name: redbook-service-user
-  cloud:
-    nacos:
-      discovery:
-        server-addr: 10.1.40.66:8848
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/rb_user?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://10.1.40.66:3306/rb_user?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 1234
   redis:
@@ -36,8 +34,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-oss:
-  endpoint: oss-cn-hangzhou.aliyuncs.com
-  accessKeyId: LTAI5t5b5R2GY5pPqWC9xJ2E
-  accessKeySecret: eqPcqet6nQnofWx6w7P2cBXQ49WA3x
-  bucketName: your-bucket-name
+minio:
+  endpoint: http://10.1.40.66:9000
+  accessKey: admin        # 刚才你设置的账号
+  secretKey: minio123321     # 刚才你设置的密码
+  bucketName: redbook   # 你的桶名字

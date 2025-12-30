@@ -41,7 +41,6 @@
               :key="sub.id"
               class="subcategory-item"
               :class="{ active: selectedCategory2 === sub.id }"
-              :style="selectedCategory2 === sub.id ? 'background: #fff1f2; color: #ff2442; border: 1px solid #ff2442; font-weight: 500;' : ''"
               @click="handleCategory2Click(sub)"
           >
             <div class="subcategory-text">{{ sub.name }} <span v-if="false">({{sub.id}})</span></div>
@@ -107,7 +106,7 @@
     </div>
 
     <!-- 商品列表 (瀑布流) -->
-    <div class="product-list-content">
+    <div ref="listContainerRef" class="product-list-content">
       <div v-if="loading && page === 1" class="loading-state">
         <div class="spinner"></div>
         <p>正在搜索...</p>
@@ -150,15 +149,16 @@
       <!-- 加载更多 -->
       <div v-if="products.length > 0" class="load-more">
         <span v-if="loading">加载中...</span>
-        <span v-else-if="hasMore" @click="loadMore">点击加载更多</span>
+        <span v-else-if="hasMore">下拉加载更多</span>
         <span v-else>没有更多了</span>
+        <div ref="loadMoreTriggerRef" class="load-more-trigger"></div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import {ref, computed, onMounted, onUnmounted, watch} from 'vue'
+import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue'
 import {useRouter, useRoute} from 'vue-router'
 import {searchProduct, getCategoryList} from '@/api/product'
 import {getImageUrl} from '@/utils/image'
@@ -170,6 +170,7 @@ const route = useRoute()
 // 状态
 const searchKeyword = ref('')
 const categoryId = ref(null)
+const categoryIds = ref([])
 const products = ref([])
 const loading = ref(false)
 const page = ref(1)
@@ -192,6 +193,9 @@ const categoryLevel2 = ref([])
 const selectedCategory1 = ref(null)
 const selectedCategory2 = ref(null)
 const categoryScroll = ref(null)
+const listContainerRef = ref(null)
+const loadMoreTriggerRef = ref(null)
+let loadMoreObserver = null
 
 // 计算属性
 const priceSortIcon = computed(() => {
@@ -304,52 +308,60 @@ const fetchCategories = async () => {
 // 点击一级分类
 const handleCategory1Click = async (item) => {
   selectedCategory1.value = item.id
-  selectedCategory2.value = null // 切换一级分类时重置二级分类选中
+  selectedCategory2.value = null
   
   if (item.id === -1) {
     // 点击全部
     categoryId.value = null
+    categoryIds.value = []
     categoryLevel2.value = []
     handleSearch() // 重新搜索全部商品
     return
   }
 
-  // 不是全部，正常加载子分类
-  // categoryId.value = null // 这里不应该立即重置搜索，除非点击一级分类也触发搜索
-  // 按照通常交互，点击一级分类展示其子分类，点击子分类才触发筛选
-  // 如果产品要求点击一级分类也筛选，则这里赋值 item.id，但目前代码逻辑是点击子分类才赋值
-  
   categoryLevel2.value = [] // 先清空
 
   try {
     // 获取 level=2 且 parentId=item.id 的分类
     const res = await getCategoryList(item.id, 2)
-    categoryLevel2.value = res || []
+    const list = Array.isArray(res) ? res : []
+    const allOption = { id: -1, name: '全部' }
+    categoryLevel2.value = [allOption, ...list]
+
+    selectedCategory2.value = -1
+    categoryId.value = null
+    const ids = list.map(c => c.id).filter(v => v != null)
+    categoryIds.value = ids.length > 0 ? ids : [-1]
+    handleSearch()
   } catch (err) {
-    console.error('Failed to load subcategories', err)
+    const allOption = { id: -1, name: '全部' }
+    categoryLevel2.value = [allOption]
+    selectedCategory2.value = -1
+    categoryId.value = null
+    categoryIds.value = [-1]
+    handleSearch()
   }
 }
 
 // 点击二级分类
 const handleCategory2Click = (item) => {
-  console.log('Triggered handleCategory2Click')
-  console.log('Item:', item)
-  console.log('Current selectedCategory2:', selectedCategory2.value)
-  
-  // 如果点击已选中的，则不做处理
-  if (selectedCategory2.value === item.id) {
-    console.log('Already selected category:', item.id)
+  const id = item?.id
+  if (selectedCategory2.value === id) return
+
+  if (id === -1) {
+    selectedCategory2.value = -1
+    categoryId.value = null
+    const ids = categoryLevel2.value
+      .filter(c => c && c.id != null && c.id !== -1)
+      .map(c => c.id)
+    categoryIds.value = ids.length > 0 ? ids : [-1]
+    handleSearch()
     return
   }
-  
-  // 选中新分类
-  selectedCategory2.value = item.id
-  console.log('Set selectedCategory2 to:', selectedCategory2.value)
-  categoryId.value = item.id
-  // 选中分类时清空搜索词，体验更好
-  searchKeyword.value = '' 
-  
-  console.log('Searching with categoryId:', categoryId.value, 'keyword:', searchKeyword.value)
+
+  selectedCategory2.value = id
+  categoryId.value = id
+  categoryIds.value = []
   handleSearch()
 }
 
@@ -371,6 +383,7 @@ const fetchProducts = async () => {
     const searchDto = {
       keyword: searchKeyword.value,
       categoryId: categoryId.value,
+      categoryIds: categoryIds.value,
       minPrice: minPrice.value,
       maxPrice: maxPrice.value,
       sort: sortType.value,
@@ -401,11 +414,48 @@ const fetchProducts = async () => {
     console.error('Search failed', err)
   } finally {
     loading.value = false
+    if (products.value.length > 0 && hasMore.value) {
+      startLoadMoreObserver()
+    } else {
+      stopLoadMoreObserver()
+    }
   }
 }
 
 const loadMore = () => {
   fetchProducts()
+}
+
+const stopLoadMoreObserver = () => {
+  if (loadMoreObserver) {
+    loadMoreObserver.disconnect()
+    loadMoreObserver = null
+  }
+}
+
+const startLoadMoreObserver = async () => {
+  await nextTick()
+  const root = listContainerRef.value
+  const target = loadMoreTriggerRef.value
+  if (!root || !target) return
+
+  stopLoadMoreObserver()
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries && entries[0]
+      if (!entry || !entry.isIntersecting) return
+      if (loading.value || !hasMore.value) return
+
+      stopLoadMoreObserver()
+      fetchProducts()
+    },
+    {
+      root,
+      rootMargin: '120px',
+      threshold: 0
+    }
+  )
+  loadMoreObserver.observe(target)
 }
 
 const navigateToDetail = (id) => {
@@ -432,10 +482,13 @@ onMounted(() => {
   // 加载分类
   fetchCategories()
 
+  startLoadMoreObserver()
+
   window.addEventListener('click', handleWindowClick, true)
 })
 
 onUnmounted(() => {
+  stopLoadMoreObserver()
   window.removeEventListener('click', handleWindowClick, true)
 })
 </script>
@@ -931,6 +984,10 @@ onUnmounted(() => {
   padding: 15px 0;
   font-size: 12px;
   color: #999;
+}
+
+.load-more-trigger {
+  height: 1px;
 }
 
 @keyframes spin {

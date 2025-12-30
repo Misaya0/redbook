@@ -17,6 +17,8 @@ import com.itcast.model.vo.OrderStatisticsVo;
 import com.itcast.model.vo.OrderVo;
 import com.itcast.result.Result;
 import com.itcast.service.OrderService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.redisson.api.RLock;
@@ -43,6 +45,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -53,6 +57,10 @@ public class OrderServiceImpl implements OrderService {
     private static final int DEFAULT_PAYMENT_TIMEOUT_SECONDS = 120;
     private static final String SKU_STOCK_KEY_PREFIX = "product:stock:";
     private static final String MQ_STOCK_ROLLBACK_KEY_PREFIX = "order:mq:stockRollback:";
+    /**
+     * Jackson 的 ObjectMapper 属于线程安全的重对象，复用可避免频繁创建带来的开销
+     */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /**
      * Lua 脚本：校验库存是否充足，充足则扣减库存并返回 1，否则返回 -1
@@ -332,13 +340,17 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> orderPage = orderMapper.selectPage(page, queryWrapper);
         List<Order> records = orderPage.getRecords();
 
-        Map<Integer, com.itcast.model.pojo.Product> productCache = new HashMap<>();
-        Map<Integer, ProductClient.Shop> shopCache = new HashMap<>();
-        Map<Long, User> userCache = new HashMap<>();
+        // 批量预取商家备注，避免 buildOrderVo 内部逐条查询导致 N+1
+        Map<Long, String> memoCache = loadMerchantMemoMap(records);
+
+        Map<Long, Sku> skuMap = loadSkuMap(records);
+        Map<Long, User> userMap = loadUserMap(records);
+        ProductAndShopMapResult productAndShop = loadProductAndShopMap(records);
         List<OrderVo> orderVos = records.stream()
-                .map(order -> buildOrderVo(order, productCache, shopCache, userCache))
+                .map(order -> buildOrderVo(order, skuMap, userMap, productAndShop.productMap, productAndShop.shopMap, memoCache))
                 .collect(Collectors.toList());
 
+        log.info("Service方法执行完毕，准备返回结果，数量：{}", orderVos.size());
         return Result.success(orderVos, orderPage.getTotal());
     }
 
@@ -373,7 +385,12 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        OrderVo vo = buildOrderVo(order, new HashMap<>(), new HashMap<>(), new HashMap<>());
+        Map<Long, String> memoCache = loadMerchantMemoMap(Collections.singletonList(order));
+        List<Order> singleton = Collections.singletonList(order);
+        Map<Long, Sku> skuMap = loadSkuMap(singleton);
+        Map<Long, User> userMap = loadUserMap(singleton);
+        ProductAndShopMapResult productAndShop = loadProductAndShopMap(singleton);
+        OrderVo vo = buildOrderVo(order, skuMap, userMap, productAndShop.productMap, productAndShop.shopMap, memoCache);
         return Result.success(vo);
     }
 
@@ -618,20 +635,19 @@ public class OrderServiceImpl implements OrderService {
                 return;
             }
 
-            for (Order overdue : overdueOrders) {
-                if (overdue == null || overdue.getId() == null) {
-                    continue;
-                }
-                UpdateWrapper<Order> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("id", overdue.getId())
-                        .eq("status", OrderStatusEnum.DUE.getCode())
-                        .set("status", OrderStatusEnum.CANCEL.getCode());
-                int updated = orderMapper.update(null, updateWrapper);
-                if (updated > 0) {
-                    restoreSkuStock(overdue);
-                    log.info("cancelTimeoutOrders orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", overdue.getId(), overdue.getUserId(), overdue.getSkuId(), overdue.getQuantity(), overdue.getCreateTime(), cutoff);
-                }
-            }
+            overdueOrders.parallelStream()
+                    .filter(overdue -> overdue != null && overdue.getId() != null)
+                    .forEach(overdue -> {
+                        UpdateWrapper<Order> updateWrapper = new UpdateWrapper<>();
+                        updateWrapper.eq("id", overdue.getId())
+                                .eq("status", OrderStatusEnum.DUE.getCode())
+                                .set("status", OrderStatusEnum.CANCEL.getCode());
+                        int updated = orderMapper.update(null, updateWrapper);
+                        if (updated > 0) {
+                            restoreSkuStock(overdue);
+                            log.info("cancelTimeoutOrders orderId={}, userId={}, skuId={}, quantity={}, createTime={}, cutoff={}", overdue.getId(), overdue.getUserId(), overdue.getSkuId(), overdue.getQuantity(), overdue.getCreateTime(), cutoff);
+                        }
+                    });
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
@@ -816,14 +832,190 @@ public class OrderServiceImpl implements OrderService {
             return Result.success(new ArrayList<>(), 0L);
         }
 
-        Map<Integer, Product> productCache = new HashMap<>();
-        Map<Integer, ProductClient.Shop> shopCache = new HashMap<>();
-        Map<Long, User> userCache = new HashMap<>();
+        // 批量预取商家备注，避免 buildOrderVo 内部逐条查询导致 N+1
+        Map<Long, String> memoCache = loadMerchantMemoMap(records);
+
+        Map<Long, Sku> skuMap = loadSkuMap(records);
+        Map<Long, User> userMap = loadUserMap(records);
+        ProductAndShopMapResult productAndShop = loadProductAndShopMap(records);
         List<OrderVo> orderVos = records.stream()
-                .map(order -> buildOrderVo(order, productCache, shopCache, userCache))
+                .map(order -> buildOrderVo(order, skuMap, userMap, productAndShop.productMap, productAndShop.shopMap, memoCache))
                 .collect(Collectors.toList());
 
         return Result.success(orderVos, orderPage.getTotal());
+    }
+
+    /**
+     * 批量加载订单的商家备注（merchant_memo），用于列表页避免 N+1 查询
+     */
+    private Map<Long, String> loadMerchantMemoMap(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> orderIds = orders.stream()
+                .filter(o -> o != null && o.getId() != null)
+                .map(Order::getId)
+                .collect(Collectors.toList());
+        if (orderIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        QueryWrapper<OrderAttribute> attrQuery = new QueryWrapper<>();
+        attrQuery.in("order_id", orderIds);
+        attrQuery.eq("label", "merchant_memo");
+        attrQuery.select("order_id", "value");
+
+        List<OrderAttribute> attrs = orderAttributeMapper.selectList(attrQuery);
+        if (attrs == null || attrs.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, String> memoMap = new HashMap<>(attrs.size() * 2);
+        for (OrderAttribute attr : attrs) {
+            if (attr == null || attr.getOrderId() == null) {
+                continue;
+            }
+            Long orderId = attr.getOrderId();
+            String existing = memoMap.get(orderId);
+            if (!memoMap.containsKey(orderId) || !StringUtils.hasText(existing)) {
+                memoMap.put(orderId, attr.getValue());
+            }
+        }
+        return memoMap;
+    }
+
+    private Map<Long, Sku> loadSkuMap(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> skuIds = orders.stream()
+                .filter(o -> o != null && o.getSkuId() != null)
+                .map(Order::getSkuId)
+                .distinct()
+                .collect(Collectors.toList());
+        if (skuIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ConcurrentMap<Long, Sku> skuMap = new ConcurrentHashMap<>(skuIds.size() * 2);
+        skuIds.parallelStream().forEach(skuId -> {
+            try {
+                Result<Sku> skuResult = productClient.getSku(skuId);
+                if (skuResult != null && skuResult.getCode() == 200 && skuResult.getData() != null && skuResult.getData().getId() != null) {
+                    skuMap.put(skuResult.getData().getId(), skuResult.getData());
+                }
+            } catch (Exception ignored) {
+            }
+        });
+        return skuMap;
+    }
+
+    private Map<Long, User> loadUserMap(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> userIds = orders.stream()
+                .filter(o -> o != null && o.getUserId() != null)
+                .map(Order::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ConcurrentMap<Long, User> userMap = new ConcurrentHashMap<>(userIds.size() * 2);
+        userIds.parallelStream().forEach(userId -> {
+            try {
+                Result<User> userResult = userClient.getUserById(userId);
+                if (userResult != null && userResult.getCode() == 200 && userResult.getData() != null && userResult.getData().getId() != null) {
+                    userMap.put(userResult.getData().getId(), userResult.getData());
+                }
+            } catch (Exception ignored) {
+            }
+        });
+        return userMap;
+    }
+
+    private static class ProductAndShopMapResult {
+        private final Map<Integer, Product> productMap;
+        private final Map<Integer, ProductClient.Shop> shopMap;
+
+        private ProductAndShopMapResult(Map<Integer, Product> productMap, Map<Integer, ProductClient.Shop> shopMap) {
+            this.productMap = productMap;
+            this.shopMap = shopMap;
+        }
+    }
+
+    private ProductAndShopMapResult loadProductAndShopMap(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return new ProductAndShopMapResult(Collections.emptyMap(), Collections.emptyMap());
+        }
+
+        List<Integer> productIds = orders.stream()
+                .filter(o -> o != null && o.getProductId() != null)
+                .map(Order::getProductId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Integer> shopIds = orders.stream()
+                .filter(o -> o != null && o.getShopId() != null)
+                .map(Order::getShopId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        ConcurrentMap<Integer, Product> productMap = new ConcurrentHashMap<>(Math.max(16, productIds.size() * 2));
+        ConcurrentMap<Integer, ProductClient.Shop> shopMap = new ConcurrentHashMap<>(Math.max(16, shopIds.size() * 2));
+
+        if (!productIds.isEmpty()) {
+            productIds.parallelStream().forEach(productId -> {
+                try {
+                    Result<ProductClient.ProductDetail> productResult = productClient.getProductById(productId);
+                    if (productResult != null && productResult.getCode() == 200 && productResult.getData() != null && productResult.getData().getId() != null) {
+                        ProductClient.ProductDetail detail = productResult.getData();
+                        productMap.put(detail.getId(), detail);
+                        if (detail.shop != null && detail.shop.id != null) {
+                            shopMap.put(detail.shop.id, detail.shop);
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        List<Integer> derivedShopIds = productMap.values().stream()
+                .map(Product::getShopId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!derivedShopIds.isEmpty()) {
+            derivedShopIds.parallelStream().forEach(shopId -> {
+                if (shopMap.containsKey(shopId)) {
+                    return;
+                }
+                try {
+                    Result<ProductClient.Shop> shopResult = productClient.getShopById(shopId);
+                    if (shopResult != null && shopResult.getCode() == 200 && shopResult.getData() != null && shopResult.getData().id != null) {
+                        shopMap.put(shopResult.getData().id, shopResult.getData());
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        if (!shopIds.isEmpty()) {
+            shopIds.parallelStream().forEach(shopId -> {
+                try {
+                    Result<ProductClient.Shop> shopResult = productClient.getShopById(shopId);
+                    if (shopResult != null && shopResult.getCode() == 200 && shopResult.getData() != null && shopResult.getData().id != null) {
+                        shopMap.put(shopResult.getData().id, shopResult.getData());
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        return new ProductAndShopMapResult(productMap, shopMap);
     }
 
     private boolean isOrderInMerchantShop(Order order, Integer merchantShopId, Map<Integer, Integer> productShopCache) {
@@ -853,7 +1045,7 @@ public class OrderServiceImpl implements OrderService {
         return shopId != null && shopId.equals(merchantShopId);
     }
 
-    private OrderVo buildOrderVo(Order order, Map<Integer, Product> productCache, Map<Integer, ProductClient.Shop> shopCache, Map<Long, User> userCache) {
+    private OrderVo buildOrderVo(Order order, Map<Long, Sku> skuMap, Map<Long, User> userMap, Map<Integer, Product> productMap, Map<Integer, ProductClient.Shop> shopMap, Map<Long, String> memoCache) {
         OrderVo vo = new OrderVo();
         if (order == null) {
             return vo;
@@ -862,18 +1054,7 @@ public class OrderServiceImpl implements OrderService {
 
         Product product = null;
         if (order.getProductId() != null) {
-            Integer productId = order.getProductId();
-            product = productCache.get(productId);
-            if (product == null) {
-                try {
-                    Result<ProductClient.ProductDetail> productResult = productClient.getProductById(productId);
-                    if (productResult != null && productResult.getCode() == 200 && productResult.getData() != null) {
-                        product = productResult.getData();
-                        productCache.put(productId, product);
-                    }
-                } catch (Exception ignored) {
-                }
-            }
+            product = productMap == null ? null : productMap.get(order.getProductId());
             if (product != null) {
                 vo.setProductName(product.getName());
                 vo.setProductImage(StringUtils.hasText(product.getMainImage()) ? product.getMainImage() : product.getImage());
@@ -881,35 +1062,29 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (order.getSkuId() != null) {
-            try {
-                Result<Sku> skuResult = productClient.getSku(order.getSkuId());
-                if (skuResult != null && skuResult.getCode() == 200 && skuResult.getData() != null) {
-                    Sku sku = skuResult.getData();
-                    if (!StringUtils.hasText(vo.getProductName())) {
-                        vo.setProductName(sku.getName());
-                    }
-                    if (!StringUtils.hasText(vo.getProductImage())) {
-                        vo.setProductImage(sku.getImage());
-                    }
+            Sku sku = skuMap == null ? null : skuMap.get(order.getSkuId());
+            if (sku != null) {
+                if (!StringUtils.hasText(vo.getProductName())) {
+                    vo.setProductName(sku.getName());
+                }
+                if (!StringUtils.hasText(vo.getProductImage())) {
+                    vo.setProductImage(sku.getImage());
+                }
 
-                    // 解析规格
-                    if (StringUtils.hasText(sku.getSpecs())) {
-                        try {
-                            Map<String, String> specs = new com.fasterxml.jackson.databind.ObjectMapper().readValue(sku.getSpecs(), Map.class);
-                            if (specs != null && !specs.isEmpty()) {
-                                String specStr = specs.entrySet()
-                                        .stream()
-                                        .map(e -> e.getKey() + ":" + e.getValue())
-                                        .collect(Collectors.joining(" / "));
-                                vo.setSkuSpec(specStr);
-                            }
-                        } catch (Exception e) {
-                            // 解析失败直接显示原始字符串
-                             vo.setSkuSpec(sku.getSpecs());
+                if (StringUtils.hasText(sku.getSpecs())) {
+                    try {
+                        Map<String, String> specs = OBJECT_MAPPER.readValue(sku.getSpecs(), new TypeReference<Map<String, String>>() {});
+                        if (specs != null && !specs.isEmpty()) {
+                            String specStr = specs.entrySet()
+                                    .stream()
+                                    .map(e -> e.getKey() + ":" + e.getValue())
+                                    .collect(Collectors.joining(" / "));
+                            vo.setSkuSpec(specStr);
                         }
+                    } catch (Exception e) {
+                        vo.setSkuSpec(sku.getSpecs());
                     }
                 }
-            } catch (Exception ignored) {
             }
         }
 
@@ -922,18 +1097,8 @@ public class OrderServiceImpl implements OrderService {
         if (shopId == null && product != null) {
             shopId = product.getShopId();
         }
-        if (shop == null && shopId != null) {
-            shop = shopCache.get(shopId);
-            if (shop == null) {
-                try {
-                    Result<ProductClient.Shop> shopResult = productClient.getShopById(shopId);
-                    if (shopResult != null && shopResult.getCode() == 200 && shopResult.getData() != null) {
-                        shop = shopResult.getData();
-                        shopCache.put(shopId, shop);
-                    }
-                } catch (Exception ignored) {
-                }
-            }
+        if (shop == null && shopId != null && shopMap != null) {
+            shop = shopMap.get(shopId);
         }
         if (shop != null) {
             vo.setStoreName(shop.name);
@@ -943,17 +1108,7 @@ public class OrderServiceImpl implements OrderService {
         // 填充买家信息（真实数据）
         if (order.getUserId() != null) {
             Long buyerId = order.getUserId();
-            User buyer = userCache.get(buyerId);
-            if (buyer == null) {
-                try {
-                    Result<User> buyerResult = userClient.getUserById(buyerId);
-                    if (buyerResult != null && buyerResult.getCode() == 200 && buyerResult.getData() != null) {
-                        buyer = buyerResult.getData();
-                        userCache.put(buyerId, buyer);
-                    }
-                } catch (Exception ignored) {
-                }
-            }
+            User buyer = userMap == null ? null : userMap.get(buyerId);
 
             if (buyer != null && StringUtils.hasText(buyer.getNickname())) {
                 vo.setBuyerName(buyer.getNickname());
@@ -970,16 +1125,10 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 填充商家备注
-        try {
-             QueryWrapper<OrderAttribute> attrQuery = new QueryWrapper<>();
-             attrQuery.eq("order_id", order.getId());
-             attrQuery.eq("label", "merchant_memo");
-             OrderAttribute attr = orderAttributeMapper.selectOne(attrQuery);
-             if (attr != null) {
-                 vo.setMerchantMemo(attr.getValue());
-             }
-        } catch (Exception ignored) {}
+        // 填充商家备注（优先从批量缓存读取，避免 N+1 查询）
+        if (memoCache != null && order.getId() != null && memoCache.containsKey(order.getId())) {
+            vo.setMerchantMemo(memoCache.get(order.getId()));
+        }
 
         return vo;
     }

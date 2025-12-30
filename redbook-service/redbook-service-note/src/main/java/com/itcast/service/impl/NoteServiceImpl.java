@@ -42,7 +42,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import com.itcast.util.LocalFileUtil;
+import com.itcast.util.MinioUtil;
 import com.itcast.constant.MqConstant;
 import com.itcast.model.dto.NoteEsSyncMessage;
 import org.redisson.api.RLock;
@@ -75,7 +75,7 @@ public class NoteServiceImpl implements NoteService {
     private BloomFilterUtil bloomFilterUtil;
     
     @Autowired
-    private LocalFileUtil localFileUtil;
+    private MinioUtil minioUtil;
     
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
@@ -287,8 +287,19 @@ public class NoteServiceImpl implements NoteService {
 
         // 3. 如果有新图片，上传并更新
         if (dto.getFile() != null && !dto.getFile().isEmpty()) {
-            String path = localFileUtil.uploadImg(dto.getFile().getBytes());
-            note.setImage(path);
+            // 先上传新图片，成功后再替换旧图片链接
+            String newUrl = minioUtil.upload(dto.getFile());
+            String oldUrl = note.getImage();
+            note.setImage(newUrl);
+
+            // 旧图片做一次尽力删除，避免对象存储残留（不影响主流程）
+            if (StringUtils.isNotBlank(oldUrl)) {
+                try {
+                    minioUtil.delete(oldUrl);
+                } catch (Exception e) {
+                    log.warn("删除旧图片失败（忽略）：{}", oldUrl, e);
+                }
+            }
         }
 
         // 4. 更新字段

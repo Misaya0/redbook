@@ -7,21 +7,18 @@
           <div class="stat-label">待发货</div>
           <div class="stat-value">{{ statistics.paid || 0 }}</div>
         </div>
-        <el-icon class="stat-icon"><Box /></el-icon>
       </el-card>
       <el-card shadow="hover" class="stat-card primary">
         <div class="stat-content">
           <div class="stat-label">今日成交额 (GMV)</div>
           <div class="stat-value">¥{{ statistics.totalAmount || 0 }}</div>
         </div>
-        <el-icon class="stat-icon"><Money /></el-icon>
       </el-card>
       <el-card shadow="hover" class="stat-card info">
         <div class="stat-content">
           <div class="stat-label">售后/退款处理</div>
           <div class="stat-value">{{ statistics.cancelled || 0 }}</div>
         </div>
-        <el-icon class="stat-icon"><Service /></el-icon>
       </el-card>
     </div>
 
@@ -175,7 +172,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { searchOrders, updateOrderStatus, getStatistics, type OrderVo, type OrderSearchDto, type OrderStatisticsVo } from '@/api/order';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getImageUrl } from '@/utils/image';
-import { Box, Money, Service, Edit } from '@element-plus/icons-vue';
+import { Edit } from '@element-plus/icons-vue';
 
 // 状态定义
 const loading = ref(false);
@@ -396,14 +393,6 @@ const getStatusType = (status: number) => {
   font-size: 24px;
   font-weight: bold;
   color: #333;
-}
-.stat-icon {
-  position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 40px;
-  opacity: 0.2;
 }
 
 /* 筛选区 */

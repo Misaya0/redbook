@@ -1,16 +1,14 @@
 server:
   port: 8085
 spring:
+  profiles:
+    active: dev
   application:
     name: redbook-service-note
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 20MB
-  cloud:
-    nacos:
-      discovery:
-        server-addr: 10.1.40.66:8848
   cache:
     cache-names: noteCache
     caffeine:
@@ -22,7 +20,7 @@ spring:
       ds0:
         type: com.zaxxer.hikari.HikariDataSource
         driver-class-name: com.mysql.cj.jdbc.Driver
-        jdbc-url: jdbc:mysql://localhost:3306/rb_note?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true
+        jdbc-url: jdbc:mysql://10.1.40.66:3306/rb_note?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true
         username: root
         password: 1234
         hikari:
@@ -105,11 +103,11 @@ spring:
           min-idle: 0
   elasticsearch:
     uris: http://10.1.40.66:9200
-oss:
-  endpoint: oss-cn-hangzhou.aliyuncs.com
-  accessKeyId: your-access-key-id
-  accessKeySecret: your-access-key-secret
-  bucketName: your-bucket-name
+minio:
+  endpoint: http://10.1.40.66:9000
+  accessKey: admin        # 刚才你设置的账号
+  secretKey: minio123321     # 刚才你设置的密码
+  bucketName: redbook   # 你的桶名字
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
@@ -118,10 +116,6 @@ management:
   health:
     db:
       enabled: false
-# 本地文件存储配置（用于开发测试）
-local-file:
-  upload-path: ${user.dir}/uploads
-  access-url: /note/uploads
 glm:
   api_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
   api_key: 114f0117fa8a493b845da224e024f148.UGHBeLZymMO8I5zn

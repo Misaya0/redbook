@@ -17,7 +17,7 @@ import java.util.List;
 
 @Tag(name = "关注模块", description = "用户关注/粉丝相关接口")
 @RestController
-@RequestMapping("/user")
+@RequestMapping({"/user", "/api/user"})
 public class AttentionController {
 
     @Autowired

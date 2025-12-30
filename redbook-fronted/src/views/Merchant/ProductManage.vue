@@ -16,6 +16,49 @@
           <el-button @click="resetSearch" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
+
+      <div class="category-filter" v-loading="categoryLoading" element-loading-text="加载分类中...">
+        <div class="category-header">
+          <div class="category-label">分类</div>
+
+          <div class="pill-list pill-list--level1">
+            <button
+                v-for="item in categoryLevel1"
+                :key="item.id"
+                type="button"
+                class="pill"
+                :class="{ 'pill--active': activeCategory1 === String(item.id) }"
+                @click="handleCategory1TabChange(String(item.id))"
+            >
+              {{ item.name }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="activeCategory1 !== '-1'" class="subcategory-row">
+          <div class="category-label-spacer"></div>
+          <div class="pill-list pill-list--level2">
+            <button
+                type="button"
+                class="pill pill--sub"
+                :class="{ 'pill--active': activeCategory2 == null }"
+                @click="handleCategory2Click({ id: -1 })"
+            >
+              全部
+            </button>
+            <button
+                v-for="sub in categoryLevel2"
+                :key="sub.id"
+                type="button"
+                class="pill pill--sub"
+                :class="{ 'pill--active': activeCategory2 === sub.id }"
+                @click="handleCategory2Click(sub)"
+            >
+              {{ sub.name }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 商品列表表格 -->
@@ -135,7 +178,7 @@
 <script setup>
 import {ref, reactive, onMounted, watch, computed, nextTick} from 'vue'
 import {useRouter} from 'vue-router'
-import {searchProductMySql, deleteProduct, getProductDetail, updateProduct} from '@/api/product'
+import {searchProductMySql, deleteProduct, getProductDetail, updateProduct, getCategoryList} from '@/api/product'
 import {getMyShop} from '@/api/shop'
 import {getImageUrl} from '@/utils/image'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -144,6 +187,7 @@ const router = useRouter()
 
 onMounted(() => {
   init()
+  fetchCategoryLevel1()
 })
 // 状态
 const loading = ref(false)
@@ -159,8 +203,18 @@ const pageCount = computed(() => {
 const containerRef = ref(null)
 const shopId = ref(null) // 当前商家店铺ID
 const searchForm = reactive({
-  keyword: ''
+  keyword: '',
+  categoryId: null,
+  categoryIds: []
 })
+
+// 分类筛选状态
+const categoryLoading = ref(false)
+const categoryLevel1 = ref([])
+const categoryLevel2 = ref([])
+const activeCategory1 = ref('-1') // -1: 全部
+const activeCategory2 = ref(null) // null: 全部(二级)
+
 // SKU 管理相关
 const skuDialogVisible = ref(false)
 const skuLoading = ref(false)
@@ -181,6 +235,70 @@ const init = async () => {
   } catch (err) {
     ElMessage.error('获取店铺信息失败')
   }
+}
+
+// 加载一级分类，并补充“全部”
+const fetchCategoryLevel1 = async () => {
+  if (categoryLoading.value) return
+  categoryLoading.value = true
+  try {
+    const res = await getCategoryList(null, 1)
+    const list = Array.isArray(res) ? res : []
+    categoryLevel1.value = [{id: -1, name: '全部'}, ...list]
+  } catch (e) {
+    categoryLevel1.value = [{id: -1, name: '全部'}]
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
+// 切换一级分类：加载二级分类（不直接筛选，二级点击时筛选）
+const handleCategory1TabChange = async (name) => {
+  activeCategory1.value = String(name)
+  activeCategory2.value = null
+  searchForm.categoryId = null
+  searchForm.categoryIds = []
+
+  if (activeCategory1.value === '-1') {
+    categoryLevel2.value = []
+    handleSearch()
+    return
+  }
+
+  categoryLevel2.value = []
+  categoryLoading.value = true
+  try {
+    const res = await getCategoryList(Number(activeCategory1.value), 2)
+    categoryLevel2.value = Array.isArray(res) ? res : []
+    const ids = categoryLevel2.value.map(c => c.id).filter(v => v != null)
+    searchForm.categoryIds = ids.length > 0 ? ids : [-1]
+    handleSearch()
+  } catch (e) {
+    categoryLevel2.value = []
+    searchForm.categoryIds = [-1]
+    handleSearch()
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
+// 点击二级分类：设置 categoryId 并触发搜索；支持点击“全部”清空筛选
+const handleCategory2Click = (item) => {
+  const id = item?.id
+  if (id === -1) {
+    activeCategory2.value = null
+    searchForm.categoryId = null
+    const ids = categoryLevel2.value.map(c => c.id).filter(v => v != null)
+    searchForm.categoryIds = ids.length > 0 ? ids : [-1]
+    handleSearch()
+    return
+  }
+
+  if (activeCategory2.value === id) return
+  activeCategory2.value = id
+  searchForm.categoryId = id
+  searchForm.categoryIds = []
+  handleSearch()
 }
 
 // 监听店铺ID变化，一旦获取到ID自动加载商品
@@ -211,6 +329,8 @@ const fetchList = async () => {
   try {
     const res = await searchProductMySql({
       keyword: searchForm.keyword,
+      categoryId: searchForm.categoryId,
+      categoryIds: searchForm.categoryIds,
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       shopId: shopId.value
@@ -246,6 +366,11 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.keyword = ''
+  searchForm.categoryId = null
+  searchForm.categoryIds = []
+  activeCategory1.value = '-1'
+  activeCategory2.value = null
+  categoryLevel2.value = []
   handleSearch()
 }
 
@@ -391,6 +516,107 @@ const removeSkuItem = (index) => {
   background: #f9f9f9;
   padding: 15px;
   border-radius: 4px;
+}
+
+.category-filter {
+  margin-top: 8px;
+}
+
+.category-label {
+  color: #606266;
+  font-size: 14px;
+  white-space: nowrap;
+  width: 44px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pill-list {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pill-list--level1 {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.pill {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1;
+  background: #eef0f3;
+  color: #606266;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  background: #e7e9ee;
+}
+
+.pill:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+.pill--active {
+  background: #ff2442;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(255, 36, 66, 0.25);
+}
+
+.pill--active:hover {
+  background: #e61f3b;
+  box-shadow: 0 10px 22px rgba(255, 36, 66, 0.28);
+}
+
+.pill--sub.pill--active {
+  background: #409eff;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(64, 158, 255, 0.25);
+}
+
+.pill--sub.pill--active:hover {
+  background: #337ecc;
+  box-shadow: 0 10px 22px rgba(64, 158, 255, 0.28);
+}
+
+.pill--sub {
+  padding: 7px 12px;
+}
+
+.subcategory-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.category-label-spacer {
+  width: 44px;
+  flex: 0 0 44px;
+}
+
+.pill-list--level2 {
+  flex: 1;
+  flex-wrap: wrap;
+  white-space: normal;
 }
 
 .pagination-container {

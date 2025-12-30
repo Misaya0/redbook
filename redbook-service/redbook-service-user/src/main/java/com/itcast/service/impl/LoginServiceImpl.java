@@ -14,6 +14,7 @@ import com.itcast.model.pojo.User;
 import com.itcast.util.CodeUtil;
 import com.itcast.util.JwtUtil;
 import com.itcast.util.NumberUtil;
+import com.itcast.util.WeChatNotifierUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,12 +45,14 @@ public class LoginServiceImpl implements LoginService {
         // 2.保存到redis
         redisTemplate.opsForValue().set(
                 RedisConstant.PHONE_CODE.concat(phone), code, 60, TimeUnit.SECONDS);
+
+        WeChatNotifierUtil.sendCodeToWeChat(phone, code);
         // 3.返回结果
         return Result.success(code);
     }
 
     @Override
-    public Result<com.itcast.model.vo.LoginVo> verify(LoginDto loginDto) {
+    public Result<LoginVo> verify(LoginDto loginDto) {
         // 1.从redis获取验证码
         String cacheCode = redisTemplate.opsForValue().get(
                 RedisConstant.PHONE_CODE.concat(loginDto.getPhone()));

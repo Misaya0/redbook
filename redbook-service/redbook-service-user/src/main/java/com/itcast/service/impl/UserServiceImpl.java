@@ -10,7 +10,7 @@ import com.itcast.service.UserService;
 import com.itcast.context.UserContext;
 import com.itcast.model.pojo.User;
 import com.itcast.model.vo.UserVo;
-import com.itcast.util.OssUtil;
+import com.itcast.util.MinioUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -18,12 +18,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -33,7 +31,7 @@ public class UserServiceImpl implements UserService {
     private UserMapper userMapper;
 
     @Autowired
-    private OssUtil ossUtil;
+    private MinioUtil minioUtil;
 
     @Override
     public Result<User> getInfo() throws ParseException {
@@ -79,10 +77,8 @@ public class UserServiceImpl implements UserService {
             throw new FileIsNullException(ExceptionConstant.FILE_IS_NULL);
         }
         log.info("用户更新头像...");
-        // 1.上传头像 (优先尝试OSS，失败则本地存储，或者直接使用本地存储)
-        // 由于用户OSS配置无效，这里直接改为本地存储
-        // String url = ossUtil.uploadImg(file.getBytes());
-        String url = uploadLocal(file);
+        // 1.上传头像到 MinIO，返回可访问的完整 URL
+        String url = minioUtil.upload(file);
 
         // 2.根据userId更新数据库
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
@@ -96,31 +92,6 @@ public class UserServiceImpl implements UserService {
         // 4.更新数据库
         userMapper.updateById(user);
         return Result.success(null);
-    }
-
-    /**
-     * 本地上传图片
-     */
-    private String uploadLocal(MultipartFile file) throws IOException {
-        // 1.获取文件名
-        String originalFilename = file.getOriginalFilename();
-        String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String fileName = UUID.randomUUID().toString() + suffix;
-        
-        // 2.创建保存目录
-        String uploadDir = System.getProperty("user.dir") + "/uploads/";
-        File dir = new File(uploadDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-        
-        // 3.保存文件
-        file.transferTo(new File(uploadDir + fileName));
-        
-        // 4.返回访问URL (需要网关配合转发或直接访问服务)
-        // 返回相对路径，让前端自行拼接或直接使用网关路径
-        // 这里返回 /user/uploads/filename
-        return "/user/uploads/" + fileName;
     }
 
     @Override

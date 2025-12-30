@@ -214,7 +214,9 @@ public class SearchServiceImpl implements SearchService {
         }
 
         // Category
-        if (searchDto.getCategoryId() != null) {
+        if (searchDto.getCategoryIds() != null && !searchDto.getCategoryIds().isEmpty()) {
+            boolQuery.filter(QueryBuilders.termsQuery("categoryId", searchDto.getCategoryIds()));
+        } else if (searchDto.getCategoryId() != null) {
             boolQuery.filter(QueryBuilders.termQuery("categoryId", searchDto.getCategoryId()));
         }
 

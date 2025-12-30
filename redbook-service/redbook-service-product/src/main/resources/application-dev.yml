@@ -1,0 +1,9 @@
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 10.1.40.66:8848
+        # 【非常重要】
+        # 请去 Nacos 网页新建一个“dev”命名空间
+        # 然后把那个新生成的 ID 填在这里！不要用原来的那个！
+        namespace: 8d2749d8-cb47-4a66-82f8-a49c7daff5eb

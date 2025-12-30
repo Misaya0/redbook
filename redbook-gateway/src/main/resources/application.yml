@@ -8,14 +8,13 @@ springdoc:
         url: /api/message/v3/api-docs
     enabled: true
 spring:
+  profiles:
+    active: dev
   main:
     web-application-type: reactive
   application:
     name: redbook-gateway
   cloud:
-    nacos:
-      discovery:
-        server-addr: 10.1.40.66:8848
     gateway:
       routes:
         # ============ message-service Swagger(OpenAPI) 文档路由 ============
